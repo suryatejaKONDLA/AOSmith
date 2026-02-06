@@ -124,6 +124,7 @@
     <Compile Include="App_Start\FilterConfig.cs" />
     <Compile Include="App_Start\RouteConfig.cs" />
     <Compile Include="Controllers\AccountController.cs" />
+    <Compile Include="Controllers\ApplicationOptionsController.cs" />
     <Compile Include="Controllers\HomeController.cs" />
     <Compile Include="Controllers\StockAdjustmentController.cs" />
     <Compile Include="Filters\AuthFilter.cs" />
@@ -134,6 +135,7 @@
     <Compile Include="Helpers\DbReturnResult.cs" />
     <Compile Include="Helpers\IDatabaseHelper.cs" />
     <Compile Include="Helpers\SessionHelper.cs" />
+    <Compile Include="Models\ApplicationOptions.cs" />
     <Compile Include="Models\ApprovalStatusConstants.cs" />
     <Compile Include="Models\ApprovalStatusConstants2.cs" />
     <Compile Include="Models\ApprovalStatusMaster.cs" />
@@ -213,6 +215,7 @@
     <Content Include="Views\Account\Login.cshtml" />
     <Content Include="Views\Home\Index.cshtml" />
     <Content Include="Views\StockAdjustment\Create.cshtml" />
+    <Content Include="Views\ApplicationOptions\Index.cshtml" />
   </ItemGroup>
   <ItemGroup>
     <Folder Include="App_Data\" />

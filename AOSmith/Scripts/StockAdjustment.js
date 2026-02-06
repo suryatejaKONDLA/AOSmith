@@ -225,6 +225,9 @@
         $('#modalItemDesc').val('');
         $('#locationMatchWarning').hide();
 
+        // Reset To Location to enabled state
+        $('#modalToLocation').prop('disabled', false).css('background-color', '');
+
         if (index >= 0) {
             // Edit mode - populate form
             const item = gridData[index];
@@ -271,26 +274,64 @@
     // Handle REC Type change
     function handleRecTypeChange() {
         const recType = parseInt($('#modalRecType').val());
-        
+
         if (recType === 12) {
-            // REC Type 12: From and To must match
+            // REC Type 12 (STOCK INCREASE): From and To must match
             $('#locationMatchWarning').show();
-            
+
+            // Clear and enable To Location
+            $('#modalToLocation').val('');
+            $('#modalToLocation').prop('disabled', false).css('background-color', '');
+
             // Auto-sync To location when From changes
             $('#modalFromLocation').off('change.sync').on('change.sync', function () {
                 $('#modalToLocation').val($(this).val());
             });
-            
+
             // Auto-sync From location when To changes
             $('#modalToLocation').off('change.sync').on('change.sync', function () {
                 $('#modalFromLocation').val($(this).val());
             });
-        } else {
-            // REC Type 10: Can be different
+        } else if (recType === 10) {
+            // REC Type 10 (STOCK DECREASE): To Location is read-only from APP_Options
             $('#locationMatchWarning').hide();
             $('#modalFromLocation').off('change.sync');
             $('#modalToLocation').off('change.sync');
+
+            // Load default location from APP_Options and set To Location as readonly
+            loadDefaultLocationForStockDecrease();
+        } else {
+            // Other types or no selection
+            $('#locationMatchWarning').hide();
+            $('#modalFromLocation').off('change.sync');
+            $('#modalToLocation').off('change.sync');
+
+            // Clear and enable To Location
+            $('#modalToLocation').val('');
+            $('#modalToLocation').prop('disabled', false).css('background-color', '');
         }
+    }
+
+    // Load default location for Stock Decrease (REC Type 10)
+    function loadDefaultLocationForStockDecrease() {
+        $.ajax({
+            url: '/StockAdjustment/GetDefaultLocation',
+            type: 'POST',
+            success: function (response) {
+                if (response.success) {
+                    $('#modalToLocation').val(response.location);
+                    $('#modalToLocation').prop('disabled', true).css('background-color', '#e9ecef');
+                } else {
+                    showAlert(response.message || 'Default location not configured', 'error');
+                    $('#modalToLocation').val('');
+                    $('#modalToLocation').prop('disabled', true).css('background-color', '#e9ecef');
+                }
+            },
+            error: function () {
+                showAlert('Error loading default location', 'error');
+                $('#modalToLocation').prop('disabled', true).css('background-color', '#e9ecef');
+            }
+        });
     }
 
     // Validate locations based on REC Type
@@ -300,7 +341,7 @@
         const toLoc = $('#modalToLocation').val();
 
         if (recType === 12 && fromLoc && toLoc && fromLoc !== toLoc) {
-            showAlert('For this adjustment type, From and To locations must be the same', 'warning');
+            showAlert('For Stock Increase, From and To locations must be the same', 'warning');
             return false;
         }
 

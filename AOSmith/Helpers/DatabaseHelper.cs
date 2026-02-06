@@ -11,16 +11,10 @@ namespace AOSmith.Helpers
 {
     public class DatabaseHelper : IDatabaseHelper
     {
-        private readonly string _connectionString;
-        private readonly int _commandTimeout;
+        private readonly string _connectionString = ConfigurationManager.ConnectionStrings["DefaultConnection"]?.ConnectionString
+                                                    ?? throw new InvalidOperationException("Connection string 'DefaultConnection' not found in configuration.");
 
-        public DatabaseHelper()
-        {
-            _connectionString = ConfigurationManager.ConnectionStrings["DefaultConnection"]?.ConnectionString
-                ?? throw new InvalidOperationException("Connection string 'DefaultConnection' not found in configuration.");
-            
-            _commandTimeout = 30; // Default timeout
-        }
+        private const int CommandTimeout = 30; // Default timeout
 
         #region Connection Management
 
@@ -39,7 +33,7 @@ namespace AOSmith.Helpers
             using (var command = new SqlCommand(spName, connection))
             {
                 command.CommandType = CommandType.StoredProcedure;
-                command.CommandTimeout = _commandTimeout;
+                command.CommandTimeout = CommandTimeout;
 
                 // Add input parameters
                 if (parameters != null)
@@ -78,7 +72,7 @@ namespace AOSmith.Helpers
             using (var command = new SqlCommand(sqlQuery, connection))
             {
                 command.CommandType = CommandType.Text;
-                command.CommandTimeout = _commandTimeout;
+                command.CommandTimeout = CommandTimeout;
 
                 if (parameters != null)
                 {

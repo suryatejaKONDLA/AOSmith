@@ -13,10 +13,10 @@ namespace AOSmith.Models
         public DateTime TransactionDate { get; set; }
 
         // Line Items
-        public List<StockAdjustment> LineItems { get; set; }
+        public List<StockAdjustment> LineItems { get; set; } = new List<StockAdjustment>();
 
         // Approval Information
-        public List<StockAdjustmentApproval> Approvals { get; set; }
+        public List<StockAdjustmentApproval> Approvals { get; set; } = new List<StockAdjustmentApproval>();
         public int ApprovedCount { get; set; }
         public int PendingCount { get; set; }
         public int RejectedCount { get; set; }
@@ -24,7 +24,7 @@ namespace AOSmith.Models
         public bool IsFullyApproved { get; set; }
 
         // File Attachments
-        public List<StockAdjustmentFile> Files { get; set; }
+        public List<StockAdjustmentFile> Files { get; set; } = new List<StockAdjustmentFile>();
         public int FilesUploadedCount { get; set; }
         public bool AllFilesUploaded { get; set; }
 
@@ -37,12 +37,5 @@ namespace AOSmith.Models
         public DateTime CreatedDate { get; set; }
         public string ModifiedBy { get; set; }
         public DateTime? ModifiedDate { get; set; }
-
-        public StockAdjustmentViewModel()
-        {
-            LineItems = new List<StockAdjustment>();
-            Approvals = new List<StockAdjustmentApproval>();
-            Files = new List<StockAdjustmentFile>();
-        }
     }
 }

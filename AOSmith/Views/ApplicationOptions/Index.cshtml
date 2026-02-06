@@ -1,0 +1,159 @@
+@model AOSmith.Models.ApplicationOptions
+@{
+    ViewBag.Title = "Application Options";
+    Layout = "~/Views/Shared/_Layout.cshtml";
+}
+
+<div class="container-fluid mt-4">
+    <div class="row justify-content-center">
+        <div class="col-lg-8 col-md-10">
+            <div class="card shadow-sm border-0">
+                <div class="card-header bg-primary text-white">
+                    <h4 class="mb-0">
+                        <i class="bi bi-gear-fill me-2"></i>Application Options
+                    </h4>
+                </div>
+                <div class="card-body p-4">
+                    @using (Html.BeginForm("Save", "ApplicationOptions", FormMethod.Post, new { id = "appOptionsForm" }))
+                    {
+                        @Html.AntiForgeryToken()
+                        @Html.HiddenFor(m => m.AppId)
+
+                        <div class="row g-4">
+                            <!-- Default Location -->
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label for="AppDefaultLocation" class="form-label fw-semibold">
+                                        Default Location <span class="text-danger">*</span>
+                                    </label>
+                                    @Html.DropDownListFor(m => m.AppDefaultLocation, 
+                                        (SelectList)ViewBag.Locations, 
+                                        "-- Select Default Location --", 
+                                        new { @class = "form-control form-select", required = "required" })
+                                    <small class="text-muted">This location will be used as default for transactions</small>
+                                </div>
+                            </div>
+
+                            <!-- Transaction Document Series -->
+                            <div class="col-md-6">
+                                <div class="form-group">
+                                    <label for="AppTranDocSeries" class="form-label fw-semibold">
+                                        Transaction Document Series <span class="text-danger">*</span>
+                                    </label>
+                                    @Html.TextBoxFor(m => m.AppTranDocSeries, 
+                                        new { @class = "form-control", 
+                                              placeholder = "e.g., SA, STK", 
+                                              maxlength = "10", 
+                                              required = "required" })
+                                    <small class="text-muted">Document series prefix for transactions (max 10 characters)</small>
+                                </div>
+                            </div>
+                        </div>
+
+                        if (Model.AppModifiedDateTime != null)
+                        {
+                            <div class="row mt-4">
+                                <div class="col-12">
+                                    <div class="alert alert-info border-0">
+                                        <i class="bi bi-info-circle me-2"></i>
+                                        <strong>Last Modified:</strong> @Model.AppModifiedDateTime.Value.ToString("dd-MMM-yyyy hh:mm tt")
+                                    </div>
+                                </div>
+                            </div>
+                        }
+
+                        <div class="row mt-4">
+                            <div class="col-12 text-center">
+                                <button type="submit" class="btn btn-primary btn-lg px-5" id="btnSave">
+                                    <i class="bi bi-save me-2"></i>Save Options
+                                </button>
+                            </div>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Toast Notifications -->
+<div class="toast-container position-fixed top-0 end-0 p-3" style="z-index: 9999">
+    <div id="successToast" class="toast align-items-center text-white bg-success border-0 shadow-lg" role="alert">
+        <div class="d-flex">
+            <div class="toast-body fw-semibold">
+                <i class="bi bi-check-circle-fill me-2"></i>
+                <span id="successToastMessage"></span>
+            </div>
+            <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+        </div>
+    </div>
+
+    <div id="errorToast" class="toast align-items-center text-white bg-danger border-0 shadow-lg" role="alert">
+        <div class="d-flex">
+            <div class="toast-body fw-semibold">
+                <i class="bi bi-x-circle-fill me-2"></i>
+                <span id="errorToastMessage"></span>
+            </div>
+            <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        $(document).ready(function () {
+            $('#appOptionsForm').on('submit', function (e) {
+                e.preventDefault();
+
+                var formData = $(this).serialize();
+
+                $.ajax({
+                    url: '@Url.Action("Save", "ApplicationOptions")',
+                    type: 'POST',
+                    data: formData,
+                    beforeSend: function () {
+                        $('#btnSave').prop('disabled', true)
+                            .html('<i class="bi bi-hourglass-split me-2"></i>Saving...');
+                    },
+                    success: function (response) {
+                        $('#btnSave').prop('disabled', false)
+                            .html('<i class="bi bi-save me-2"></i>Save Options');
+
+                        if (response.success) {
+                            showToast('success', response.message);
+                            setTimeout(function () {
+                                window.location.reload();
+                            }, 1500);
+                        } else {
+                            showToast('error', response.message);
+                        }
+                    },
+                    error: function () {
+                        $('#btnSave').prop('disabled', false)
+                            .html('<i class="bi bi-save me-2"></i>Save Options');
+                        showToast('error', 'An error occurred while saving');
+                    }
+                });
+            });
+
+            function showToast(type, message) {
+                var toastEl, toastMessage;
+
+                if (type === 'success') {
+                    toastEl = document.getElementById('successToast');
+                    toastMessage = document.getElementById('successToastMessage');
+                } else {
+                    toastEl = document.getElementById('errorToast');
+                    toastMessage = document.getElementById('errorToastMessage');
+                }
+
+                toastMessage.textContent = message;
+
+                var toast = new bootstrap.Toast(toastEl, {
+                    delay: type === 'success' ? 3000 : 5000
+                });
+                toast.show();
+            }
+        });
+    </script>
+}
