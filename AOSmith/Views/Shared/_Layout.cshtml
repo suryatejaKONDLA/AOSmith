@@ -27,13 +27,23 @@
 
                 <div class="position-sticky pt-3">
                     <ul class="nav flex-column">
-                        <li class="nav-item">
-                            <a class="nav-link @(ViewContext.RouteData.Values["Action"].ToString() == "ManageUsers" ? "active bg-primary text-white" : "text-secondary")"
-                               href="@Url.Action("ManageUsers", "Home")">
-                                <i class="bi bi-people me-2"></i>
-                                Manage Users
-                            </a>
-                        </li>
+                        @if (AOSmith.Helpers.SessionHelper.GetUserId() == 1)
+                        {
+                            <li class="nav-item">
+                                <a class="nav-link @(ViewContext.RouteData.Values["Action"].ToString() == "ManageUsers" ? "active bg-primary text-white" : "text-secondary")"
+                                   href="@Url.Action("ManageUsers", "Home")">
+                                    <i class="bi bi-people me-2"></i>
+                                    Manage Users
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link @(ViewContext.RouteData.Values["Controller"].ToString() == "ApplicationOptions" ? "active bg-primary text-white" : "text-secondary")"
+                                   href="@Url.Action("Index", "ApplicationOptions")">
+                                    <i class="bi bi-gear-fill me-2"></i>
+                                    Application Options
+                                </a>
+                            </li>
+                        }
                         <li class="nav-item">
                             <a class="nav-link @(ViewContext.RouteData.Values["Controller"].ToString() == "StockAdjustment" ? "active bg-primary text-white" : "text-secondary")"
                                href="@Url.Action("Create", "StockAdjustment")">
@@ -41,13 +51,13 @@
                                 Stock Adjustment
                             </a>
                         </li>
-                        @if (AOSmith.Helpers.SessionHelper.GetUserId() == 1)
+                        @if (AOSmith.Helpers.SessionHelper.IsApprover())
                         {
                             <li class="nav-item">
-                                <a class="nav-link @(ViewContext.RouteData.Values["Controller"].ToString() == "ApplicationOptions" ? "active bg-primary text-white" : "text-secondary")"
-                                   href="@Url.Action("Index", "ApplicationOptions")">
-                                    <i class="bi bi-gear-fill me-2"></i>
-                                    Application Options
+                                <a class="nav-link @(ViewContext.RouteData.Values["Controller"].ToString() == "Approval" ? "active bg-primary text-white" : "text-secondary")"
+                                   href="@Url.Action("Index", "Approval")">
+                                    <i class="bi bi-check-circle me-2"></i>
+                                    Approval
                                 </a>
                             </li>
                         }
@@ -63,13 +73,23 @@
                 </div>
                 <div class="offcanvas-body">
                     <ul class="nav flex-column">
-                        <li class="nav-item">
-                            <a class="nav-link @(ViewContext.RouteData.Values["Action"].ToString() == "ManageUsers" ? "active bg-primary text-white" : "text-secondary")"
-                               href="@Url.Action("ManageUsers", "Home")">
-                                <i class="bi bi-people me-2"></i>
-                                Manage Users
-                            </a>
-                        </li>
+                        @if (AOSmith.Helpers.SessionHelper.GetUserId() == 1)
+                        {
+                            <li class="nav-item">
+                                <a class="nav-link @(ViewContext.RouteData.Values["Action"].ToString() == "ManageUsers" ? "active bg-primary text-white" : "text-secondary")"
+                                   href="@Url.Action("ManageUsers", "Home")">
+                                    <i class="bi bi-people me-2"></i>
+                                    Manage Users
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link @(ViewContext.RouteData.Values["Controller"].ToString() == "ApplicationOptions" ? "active bg-primary text-white" : "text-secondary")"
+                                   href="@Url.Action("Index", "ApplicationOptions")">
+                                    <i class="bi bi-gear-fill me-2"></i>
+                                    Application Options
+                                </a>
+                            </li>
+                        }
                         <li class="nav-item">
                             <a class="nav-link @(ViewContext.RouteData.Values["Controller"].ToString() == "StockAdjustment" ? "active bg-primary text-white" : "text-secondary")"
                                href="@Url.Action("Create", "StockAdjustment")">
@@ -77,13 +97,13 @@
                                 Stock Adjustment
                             </a>
                         </li>
-                        @if (AOSmith.Helpers.SessionHelper.GetUserId() == 1)
+                        @if (AOSmith.Helpers.SessionHelper.IsApprover())
                         {
                             <li class="nav-item">
-                                <a class="nav-link @(ViewContext.RouteData.Values["Controller"].ToString() == "ApplicationOptions" ? "active bg-primary text-white" : "text-secondary")"
-                                   href="@Url.Action("Index", "ApplicationOptions")">
-                                    <i class="bi bi-gear-fill me-2"></i>
-                                    Application Options
+                                <a class="nav-link @(ViewContext.RouteData.Values["Controller"].ToString() == "Approval" ? "active bg-primary text-white" : "text-secondary")"
+                                   href="@Url.Action("Index", "Approval")">
+                                    <i class="bi bi-check-circle me-2"></i>
+                                    Approval
                                 </a>
                             </li>
                         }

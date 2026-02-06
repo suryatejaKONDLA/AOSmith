@@ -1,5 +1,5 @@
-using AOSmith.Models;
 using System.Web;
+using AOSmith.Models;
 
 namespace AOSmith.Helpers
 {
@@ -10,6 +10,7 @@ namespace AOSmith.Helpers
         private const string NameKey = "Name";
         private const string RoleKey = "Role";
         private const string EmailKey = "Email";
+        private const string IsApproverKey = "IsApprover";
 
         public static void SetUserSession(UserSession userSession)
         {
@@ -18,6 +19,7 @@ namespace AOSmith.Helpers
             HttpContext.Current.Session[NameKey] = userSession.Name;
             HttpContext.Current.Session[RoleKey] = userSession.Role;
             HttpContext.Current.Session[EmailKey] = userSession.Email;
+            HttpContext.Current.Session[IsApproverKey] = userSession.IsApprover;
         }
 
         public static UserSession GetUserSession()
@@ -31,7 +33,8 @@ namespace AOSmith.Helpers
                 Username = HttpContext.Current.Session[UsernameKey]?.ToString(),
                 Name = HttpContext.Current.Session[NameKey]?.ToString(),
                 Role = HttpContext.Current.Session[RoleKey]?.ToString(),
-                Email = HttpContext.Current.Session[EmailKey]?.ToString()
+                Email = HttpContext.Current.Session[EmailKey]?.ToString(),
+                IsApprover = HttpContext.Current.Session[IsApproverKey] as bool? ?? false
             };
         }
 
@@ -58,6 +61,11 @@ namespace AOSmith.Helpers
         public static string GetUserRole()
         {
             return HttpContext.Current.Session[RoleKey]?.ToString();
+        }
+
+        public static bool IsApprover()
+        {
+            return HttpContext.Current.Session[IsApproverKey] as bool? ?? false;
         }
 
         public static void ClearSession()

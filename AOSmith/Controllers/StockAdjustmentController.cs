@@ -6,6 +6,7 @@ using System.Web.Mvc;
 using AOSmith.Filters;
 using AOSmith.Helpers;
 using AOSmith.Models;
+using AOSmith.Services;
 using Newtonsoft.Json;
 
 namespace AOSmith.Controllers
@@ -14,6 +15,7 @@ namespace AOSmith.Controllers
     public class StockAdjustmentController : Controller
     {
         private readonly IDatabaseHelper _dbHelper = new DatabaseHelper();
+        private readonly SageApiService _sageService = new SageApiService();
 
         public async Task<ActionResult> Create()
         {
@@ -138,6 +140,7 @@ namespace AOSmith.Controllers
 
                 var successMessages = new List<string>();
                 var errorMessages = new List<string>();
+                var sageResponses = new List<object>();
 
                 // Process each RecType group as a separate transaction
                 foreach (var group in groupedByRecType)
@@ -199,6 +202,27 @@ namespace AOSmith.Controllers
                     if (result.ResultVal == 1)
                     {
                         successMessages.Add(result.ResultMessage);
+
+                        // Only send RecType 10 (Stock Decrease) to Sage300
+                        if (recType == 10)
+                        {
+                            var recNumber = ExtractRecNumber(result.ResultMessage);
+                            var documentReference = ExtractDocumentReference(result.ResultMessage);
+
+                            var sageResponse = await _sageService.SendTransferEntryAsync(
+                                items, transactionDate, recNumber, recType);
+
+                            sageResponses.Add(new
+                            {
+                                recType,
+                                recNumber,
+                                documentReference,
+                                sageStatus = sageResponse.Status,
+                                sageMessage = sageResponse.Message,
+                                sageRawResponse = sageResponse.RawResponse,
+                                sageRawRequest = sageResponse.RawRequest
+                            });
+                        }
                     }
                     else
                     {
@@ -215,7 +239,8 @@ namespace AOSmith.Controllers
                         message = "Some transactions failed:\n" + string.Join("\n", errorMessages),
                         successCount = successMessages.Count,
                         errorCount = errorMessages.Count,
-                        resultType = "error"
+                        resultType = "error",
+                        sageResults = sageResponses
                     });
                 }
                 else
@@ -229,7 +254,8 @@ namespace AOSmith.Controllers
                         success = true,
                         message = consolidatedMessage,
                         transactionCount = successMessages.Count,
-                        resultType = "success"
+                        resultType = "success",
+                        sageResults = sageResponses
                     });
                 }
             }
@@ -242,6 +268,45 @@ namespace AOSmith.Controllers
                     resultType = "error"
                 });
             }
+        }
+
+        private int ExtractRecNumber(string resultMessage)
+        {
+            if (string.IsNullOrEmpty(resultMessage)) return 0;
+
+            // Try to extract Document Reference format: 202526/STDL/1 or 202526/STIN/1
+            var docRefMatch = System.Text.RegularExpressions.Regex.Match(resultMessage, @"(\d{6})/([A-Z]+)/(\d+)",
+                System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+
+            if (docRefMatch.Success && int.TryParse(docRefMatch.Groups[3].Value, out var recNum))
+            {
+                return recNum;
+            }
+
+            // Fallback: try to find any number in the message
+            var numMatch = System.Text.RegularExpressions.Regex.Match(resultMessage, @"(\d+)");
+            if (numMatch.Success && int.TryParse(numMatch.Groups[1].Value, out var num))
+            {
+                return num;
+            }
+
+            return 0;
+        }
+
+        private string ExtractDocumentReference(string resultMessage)
+        {
+            if (string.IsNullOrEmpty(resultMessage)) return "";
+
+            // Extract Document Reference format: 202526/STDL/1 or 202526/STIN/1
+            var docRefMatch = System.Text.RegularExpressions.Regex.Match(resultMessage, @"(\d{6}/[A-Z]+/\d+)",
+                System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+
+            if (docRefMatch.Success)
+            {
+                return docRefMatch.Groups[1].Value;
+            }
+
+            return "";
         }
 
         private System.Data.DataTable CreateStockDetailsDataTable(List<StockAdjustmentLineItem> lineItems)
