@@ -46,7 +46,8 @@ namespace AOSmith.Services
                 Name = user.LoginName,
                 Role = user.LoginDesignation,
                 Email = user.LoginEmailId,
-                IsApprover = user.LoginIsApprover
+                IsApprover = user.LoginIsApprover,
+                ApprovalLevel = user.LoginApprovalLevel ?? 0
             };
 
             return LoginResponse.Success(userSession);

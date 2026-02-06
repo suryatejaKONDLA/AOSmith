@@ -2,42 +2,69 @@
     ViewBag.Title = "Approval";
 }
 
+<style>
+    .approval-badge { font-size: 0.75rem; padding: 4px 8px; }
+    .level-badge { display: inline-block; min-width: 60px; text-align: center; margin: 2px; }
+    .detail-row { background-color: #f8f9fa; }
+    .detail-row td { padding: 0 !important; }
+    .line-items-table { margin: 0; font-size: 0.85rem; }
+    .line-items-table th { background-color: #e9ecef; }
+    .approval-timeline { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+    .approval-level-card {
+        border: 1px solid #dee2e6;
+        border-radius: 6px;
+        padding: 6px 10px;
+        font-size: 0.8rem;
+        min-width: 100px;
+        text-align: center;
+    }
+    .level-pending { border-color: #ffc107; background-color: #fff8e1; }
+    .level-approved { border-color: #28a745; background-color: #e8f5e9; }
+    .level-rejected { border-color: #dc3545; background-color: #fce4ec; }
+    .level-waiting { border-color: #6c757d; background-color: #f5f5f5; color: #999; }
+    .arrow-separator { color: #999; font-size: 1.2rem; }
+    .doc-row { cursor: pointer; }
+    .doc-row:hover { background-color: #f0f4ff; }
+</style>
+
 <div class="container-fluid">
     <div class="row">
         <div class="col-12">
             <h2 class="mb-4">
                 <i class="bi bi-check-circle me-2"></i>
-                Pending Approvals
+                Approval Dashboard
+                <small class="text-muted fs-6 ms-2" id="userLevelBadge"></small>
             </h2>
 
             <div class="card shadow-sm">
-                <div class="card-header bg-primary text-white">
-                    <h5 class="mb-0">Stock Adjustment Approvals</h5>
+                <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">Stock Increase (STIN) - Approval Queue</h5>
+                    <button class="btn btn-sm btn-outline-light" onclick="loadPendingApprovals()">
+                        <i class="bi bi-arrow-clockwise me-1"></i> Refresh
+                    </button>
                 </div>
                 <div class="card-body">
                     <div class="table-responsive">
                         <table class="table table-hover table-bordered" id="approvalTable">
                             <thead class="table-light">
                                 <tr>
+                                    <th style="width: 30px;"></th>
                                     <th>Document Ref</th>
                                     <th>Date</th>
+                                    <th>Created By</th>
                                     <th>Department</th>
-                                    <th>Item</th>
-                                    <th>From Location</th>
-                                    <th>To Location</th>
-                                    <th>Quantity</th>
-                                    <th>Reason</th>
+                                    <th>Approval Progress</th>
                                     <th>Status</th>
                                     <th>Actions</th>
                                 </tr>
                             </thead>
-                            <tbody>
+                            <tbody id="approvalTableBody">
                                 <tr>
-                                    <td colspan="10" class="text-center">
+                                    <td colspan="8" class="text-center py-4">
                                         <div class="spinner-border text-primary" role="status">
                                             <span class="visually-hidden">Loading...</span>
                                         </div>
-                                        <p class="mt-2">Loading pending approvals...</p>
+                                        <p class="mt-2 mb-0">Loading approvals...</p>
                                     </td>
                                 </tr>
                             </tbody>
@@ -49,7 +76,7 @@
     </div>
 </div>
 
-<!-- Approval Modal -->
+<!-- Approval Action Modal -->
 <div class="modal fade" id="approvalModal" tabindex="-1" aria-labelledby="approvalModalLabel" aria-hidden="true">
     <div class="modal-dialog">
         <div class="modal-content">
@@ -58,24 +85,75 @@
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
+                <div class="mb-3">
+                    <strong>Document:</strong> <span id="modalDocRef"></span>
+                </div>
+                <div class="mb-3">
+                    <strong>Your Level:</strong> <span id="modalLevel" class="badge bg-info"></span>
+                </div>
                 <form id="approvalForm">
-                    <input type="hidden" id="approvalId" />
+                    <input type="hidden" id="approvalFinYear" />
+                    <input type="hidden" id="approvalRecNumber" />
                     <input type="hidden" id="approvalAction" />
 
                     <div class="mb-3">
                         <label for="approvalRemarks" class="form-label">Remarks</label>
-                        <textarea class="form-control" id="approvalRemarks" rows="3" placeholder="Enter remarks..."></textarea>
+                        <textarea class="form-control" id="approvalRemarks" rows="3" placeholder="Enter remarks (required for rejection)..."></textarea>
                     </div>
                 </form>
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-success" id="btnApprove">
-                    <i class="bi bi-check-circle me-1"></i> Approve
+                <button type="button" class="btn btn-success" id="btnConfirmApprove" style="display:none;">
+                    <i class="bi bi-check-circle me-1"></i> Confirm Approve
                 </button>
-                <button type="button" class="btn btn-danger" id="btnReject">
-                    <i class="bi bi-x-circle me-1"></i> Reject
+                <button type="button" class="btn btn-danger" id="btnConfirmReject" style="display:none;">
+                    <i class="bi bi-x-circle me-1"></i> Confirm Reject
                 </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Sage API Response Modal -->
+<div class="modal fade" id="sageResponseModal" tabindex="-1" aria-labelledby="sageResponseModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="sageResponseModalLabel">
+                    <i class="bi bi-cloud-check me-2"></i>Sage Adjustment Entry - API Result
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div id="sageStatusBadge" class="mb-3"></div>
+                <div id="sageMessage" class="mb-3"></div>
+
+                <div class="mb-3">
+                    <button class="btn btn-sm btn-outline-primary" type="button" data-bs-toggle="collapse" data-bs-target="#sageRequestCollapse">
+                        <i class="bi bi-send me-1"></i> View Request Sent
+                    </button>
+                    <button class="btn btn-sm btn-outline-secondary ms-2" type="button" data-bs-toggle="collapse" data-bs-target="#sageResponseCollapse">
+                        <i class="bi bi-reply me-1"></i> View Response Received
+                    </button>
+                </div>
+
+                <div class="collapse mb-3" id="sageRequestCollapse">
+                    <div class="card card-body">
+                        <h6 class="text-primary">Request JSON:</h6>
+                        <pre id="sageRequestJson" class="bg-dark text-light p-3 rounded" style="max-height:300px; overflow:auto; font-size: 0.8rem;"></pre>
+                    </div>
+                </div>
+
+                <div class="collapse mb-3" id="sageResponseCollapse">
+                    <div class="card card-body">
+                        <h6 class="text-success">Response JSON:</h6>
+                        <pre id="sageResponseJson" class="bg-dark text-light p-3 rounded" style="max-height:300px; overflow:auto; font-size: 0.8rem;"></pre>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
             </div>
         </div>
     </div>
@@ -83,51 +161,83 @@
 
 @section Scripts {
     <script>
+        var currentUserLevel = 0;
+
         $(document).ready(function () {
             loadPendingApprovals();
 
             // Approve button click
-            $(document).on('click', '.btn-approve', function () {
-                var id = $(this).data('id');
-                $('#approvalId').val(id);
-                $('#approvalAction').val('approve');
-                $('#approvalModalLabel').text('Approve Stock Adjustment');
-                $('#btnApprove').show();
-                $('#btnReject').hide();
-                $('#approvalModal').modal('show');
+            $(document).on('click', '.btn-approve-doc', function () {
+                var finYear = $(this).data('finyear');
+                var recNumber = $(this).data('recnumber');
+                var docRef = $(this).data('docref');
+                openApprovalModal(finYear, recNumber, docRef, 'approve');
             });
 
             // Reject button click
-            $(document).on('click', '.btn-reject', function () {
-                var id = $(this).data('id');
-                $('#approvalId').val(id);
-                $('#approvalAction').val('reject');
-                $('#approvalModalLabel').text('Reject Stock Adjustment');
-                $('#btnApprove').hide();
-                $('#btnReject').show();
-                $('#approvalModal').modal('show');
+            $(document).on('click', '.btn-reject-doc', function () {
+                var finYear = $(this).data('finyear');
+                var recNumber = $(this).data('recnumber');
+                var docRef = $(this).data('docref');
+                openApprovalModal(finYear, recNumber, docRef, 'reject');
             });
 
-            // Approve action
-            $('#btnApprove').click(function () {
+            // Toggle detail row
+            $(document).on('click', '.doc-row', function (e) {
+                if ($(e.target).closest('button').length) return; // Don't toggle if clicking a button
+                var key = $(this).data('key');
+                var detailRow = $('#detail-' + key);
+                detailRow.toggle();
+                var icon = $(this).find('.toggle-icon');
+                icon.toggleClass('bi-chevron-right bi-chevron-down');
+            });
+
+            // Confirm Approve
+            $('#btnConfirmApprove').click(function () {
                 processApproval('approve');
             });
 
-            // Reject action
-            $('#btnReject').click(function () {
+            // Confirm Reject
+            $('#btnConfirmReject').click(function () {
                 processApproval('reject');
             });
         });
 
+        function openApprovalModal(finYear, recNumber, docRef, action) {
+            $('#approvalFinYear').val(finYear);
+            $('#approvalRecNumber').val(recNumber);
+            $('#approvalAction').val(action);
+            $('#modalDocRef').text(docRef);
+            $('#modalLevel').text('L' + currentUserLevel);
+            $('#approvalRemarks').val('');
+
+            if (action === 'approve') {
+                $('#approvalModalLabel').text('Approve Document');
+                $('#btnConfirmApprove').show();
+                $('#btnConfirmReject').hide();
+            } else {
+                $('#approvalModalLabel').text('Reject Document');
+                $('#btnConfirmApprove').hide();
+                $('#btnConfirmReject').show();
+            }
+
+            $('#approvalModal').modal('show');
+        }
+
         function loadPendingApprovals() {
+            var tbody = $('#approvalTableBody');
+            tbody.html('<tr><td colspan="8" class="text-center py-4"><div class="spinner-border text-primary" role="status"></div><p class="mt-2 mb-0">Loading approvals...</p></td></tr>');
+
             $.ajax({
                 url: '@Url.Action("GetPendingApprovals", "Approval")',
                 type: 'GET',
                 success: function (response) {
                     if (response.success) {
+                        currentUserLevel = response.userApprovalLevel;
+                        $('#userLevelBadge').html('<span class="badge bg-info">Your Level: L' + currentUserLevel + '</span>');
                         displayApprovals(response.data);
                     } else {
-                        showError('Failed to load approvals: ' + response.message);
+                        showError(response.message);
                     }
                 },
                 error: function (xhr, status, error) {
@@ -136,40 +246,170 @@
             });
         }
 
-        function displayApprovals(approvals) {
-            var tbody = $('#approvalTable tbody');
+        function displayApprovals(documents) {
+            var tbody = $('#approvalTableBody');
             tbody.empty();
 
-            if (approvals && approvals.length > 0) {
-                $.each(approvals, function (index, item) {
-                    var row = '<tr>' +
-                        '<td>' + (item.DocumentReference || 'N/A') + '</td>' +
-                        '<td>' + formatDate(item.Date) + '</td>' +
-                        '<td>' + (item.Department || '') + '</td>' +
-                        '<td>' + (item.ItemName || '') + '</td>' +
-                        '<td>' + (item.FromLocation || '') + '</td>' +
-                        '<td>' + (item.ToLocation || '') + '</td>' +
-                        '<td>' + (item.Quantity || 0) + '</td>' +
-                        '<td>' + (item.Reason || '') + '</td>' +
-                        '<td><span class="badge bg-warning">Pending</span></td>' +
-                        '<td>' +
-                        '<button class="btn btn-sm btn-success btn-approve me-1" data-id="' + item.Id + '" title="Approve">' +
-                        '<i class="bi bi-check-circle"></i>' +
-                        '</button>' +
-                        '<button class="btn btn-sm btn-danger btn-reject" data-id="' + item.Id + '" title="Reject">' +
-                        '<i class="bi bi-x-circle"></i>' +
-                        '</button>' +
-                        '</td>' +
-                        '</tr>';
-                    tbody.append(row);
-                });
-            } else {
-                tbody.html('<tr><td colspan="10" class="text-center">No pending approvals found.</td></tr>');
+            if (!documents || documents.length === 0) {
+                tbody.html('<tr><td colspan="8" class="text-center py-4"><i class="bi bi-inbox fs-1 text-muted"></i><p class="mt-2 mb-0 text-muted">No stock increase documents found.</p></td></tr>');
+                return;
             }
+
+            $.each(documents, function (index, doc) {
+                var key = doc.FinYear + '_' + doc.RecNumber;
+
+                // Build approval progress badges
+                var progressHtml = buildApprovalProgress(doc);
+
+                // Status badge
+                var statusHtml = getOverallStatus(doc);
+
+                // Action buttons (only if user can approve)
+                var actionsHtml = '';
+                if (doc.CanApprove) {
+                    actionsHtml =
+                        '<button class="btn btn-sm btn-success btn-approve-doc me-1" ' +
+                        'data-finyear="' + doc.FinYear + '" data-recnumber="' + doc.RecNumber + '" ' +
+                        'data-docref="' + doc.DocumentReference + '" title="Approve at L' + currentUserLevel + '">' +
+                        '<i class="bi bi-check-circle"></i> Approve</button>' +
+                        '<button class="btn btn-sm btn-danger btn-reject-doc" ' +
+                        'data-finyear="' + doc.FinYear + '" data-recnumber="' + doc.RecNumber + '" ' +
+                        'data-docref="' + doc.DocumentReference + '" title="Reject at L' + currentUserLevel + '">' +
+                        '<i class="bi bi-x-circle"></i> Reject</button>';
+                } else if (doc.NextPendingLevel === 0) {
+                    actionsHtml = '<span class="text-muted fst-italic">Fully Approved</span>';
+                } else if (doc.NextPendingLevel === -1) {
+                    actionsHtml = '<span class="text-muted fst-italic">Rejected</span>';
+                } else {
+                    actionsHtml = '<span class="text-muted fst-italic">Awaiting L' + doc.NextPendingLevel + '</span>';
+                }
+
+                // Main document row
+                var row = '<tr class="doc-row" data-key="' + key + '">' +
+                    '<td class="text-center"><i class="bi bi-chevron-right toggle-icon"></i></td>' +
+                    '<td><strong>' + doc.DocumentReference + '</strong></td>' +
+                    '<td>' + formatDate(doc.Date) + '</td>' +
+                    '<td>' + (doc.CreatedBy || '') + '</td>' +
+                    '<td>' + (doc.Department || '') + '</td>' +
+                    '<td>' + progressHtml + '</td>' +
+                    '<td>' + statusHtml + '</td>' +
+                    '<td>' + actionsHtml + '</td>' +
+                    '</tr>';
+
+                // Detail row (hidden by default)
+                var detailRow = '<tr class="detail-row" id="detail-' + key + '" style="display:none;">' +
+                    '<td colspan="8">' + buildDetailContent(doc) + '</td>' +
+                    '</tr>';
+
+                tbody.append(row);
+                tbody.append(detailRow);
+            });
+        }
+
+        function buildApprovalProgress(doc) {
+            if (!doc.Levels || doc.Levels.length === 0) {
+                return '<span class="text-muted">No approval levels</span>';
+            }
+
+            var html = '<div class="approval-timeline">';
+            $.each(doc.Levels, function (i, level) {
+                if (i > 0) {
+                    html += '<span class="arrow-separator">&#8594;</span>';
+                }
+
+                var cssClass = 'level-waiting';
+                var icon = '&#9711;'; // circle
+                if (level.StatusCode === 2) {
+                    cssClass = 'level-approved';
+                    icon = '&#10003;'; // checkmark
+                } else if (level.StatusCode === 3) {
+                    cssClass = 'level-rejected';
+                    icon = '&#10007;'; // cross
+                } else if (level.StatusCode === 1) {
+                    // Pending - check if it's the next level to approve
+                    if (doc.NextPendingLevel === level.Level) {
+                        cssClass = 'level-pending';
+                        icon = '&#9679;'; // filled circle
+                    }
+                }
+
+                var tooltip = 'L' + level.Level + ': ' + level.StatusName;
+                if (level.ApproverName) {
+                    tooltip += ' by ' + level.ApproverName;
+                }
+
+                html += '<div class="approval-level-card ' + cssClass + '" title="' + tooltip + '">' +
+                    '<div><strong>L' + level.Level + '</strong></div>' +
+                    '<div>' + icon + ' ' + level.StatusName + '</div>' +
+                    '</div>';
+            });
+            html += '</div>';
+            return html;
+        }
+
+        function getOverallStatus(doc) {
+            if (doc.RejectedCount > 0) {
+                return '<span class="badge bg-danger approval-badge">Rejected</span>';
+            }
+            if (doc.ApprovedCount === doc.TotalLevels && doc.TotalLevels > 0) {
+                return '<span class="badge bg-success approval-badge">Fully Approved</span>';
+            }
+            return '<span class="badge bg-warning text-dark approval-badge">' +
+                doc.ApprovedCount + '/' + doc.TotalLevels + ' Approved</span>';
+        }
+
+        function buildDetailContent(doc) {
+            var html = '<div class="p-3">';
+
+            // Approval levels detail
+            if (doc.Levels && doc.Levels.length > 0) {
+                html += '<h6 class="mb-2"><i class="bi bi-shield-check me-1"></i>Approval Levels</h6>';
+                html += '<table class="table table-sm table-bordered line-items-table mb-3">';
+                html += '<thead><tr><th>Level</th><th>Status</th><th>Approved By</th><th>Date</th><th>Comments</th></tr></thead>';
+                html += '<tbody>';
+                $.each(doc.Levels, function (i, level) {
+                    var statusBadge = '';
+                    if (level.StatusCode === 1) statusBadge = '<span class="badge bg-warning text-dark">Pending</span>';
+                    else if (level.StatusCode === 2) statusBadge = '<span class="badge bg-success">Approved</span>';
+                    else if (level.StatusCode === 3) statusBadge = '<span class="badge bg-danger">Rejected</span>';
+
+                    html += '<tr>' +
+                        '<td><strong>L' + level.Level + '</strong></td>' +
+                        '<td>' + statusBadge + '</td>' +
+                        '<td>' + (level.ApproverName || '-') + '</td>' +
+                        '<td>' + (level.ApprovalDate ? formatDate(level.ApprovalDate) : '-') + '</td>' +
+                        '<td>' + (level.Comments || '-') + '</td>' +
+                        '</tr>';
+                });
+                html += '</tbody></table>';
+            }
+
+            // Line items
+            if (doc.LineItems && doc.LineItems.length > 0) {
+                html += '<h6 class="mb-2"><i class="bi bi-list-ul me-1"></i>Line Items</h6>';
+                html += '<table class="table table-sm table-bordered line-items-table">';
+                html += '<thead><tr><th>#</th><th>Item Code</th><th>Description</th><th>From Location</th><th>To Location</th><th>Quantity</th></tr></thead>';
+                html += '<tbody>';
+                $.each(doc.LineItems, function (i, item) {
+                    html += '<tr>' +
+                        '<td>' + item.Sno + '</td>' +
+                        '<td>' + item.ItemCode + '</td>' +
+                        '<td>' + (item.ItemDesc || '') + '</td>' +
+                        '<td>' + item.FromLocation + ' - ' + (item.FromLocationName || '') + '</td>' +
+                        '<td>' + item.ToLocation + ' - ' + (item.ToLocationName || '') + '</td>' +
+                        '<td>' + item.Quantity + '</td>' +
+                        '</tr>';
+                });
+                html += '</tbody></table>';
+            }
+
+            html += '</div>';
+            return html;
         }
 
         function processApproval(action) {
-            var id = $('#approvalId').val();
+            var finYear = $('#approvalFinYear').val();
+            var recNumber = $('#approvalRecNumber').val();
             var remarks = $('#approvalRemarks').val();
 
             if (action === 'reject' && !remarks.trim()) {
@@ -177,42 +417,99 @@
                 return;
             }
 
+            // Disable buttons during processing
+            $('#btnConfirmApprove, #btnConfirmReject').prop('disabled', true).text('Processing...');
+
             $.ajax({
                 url: '@Url.Action("ProcessApproval", "Approval")',
                 type: 'POST',
                 data: {
-                    id: id,
+                    finYear: finYear,
+                    recNumber: recNumber,
                     action: action,
                     remarks: remarks
                 },
                 success: function (response) {
+                    $('#approvalModal').modal('hide');
+                    $('#btnConfirmApprove').prop('disabled', false).html('<i class="bi bi-check-circle me-1"></i> Confirm Approve');
+                    $('#btnConfirmReject').prop('disabled', false).html('<i class="bi bi-x-circle me-1"></i> Confirm Reject');
+
                     if (response.success) {
-                        $('#approvalModal').modal('hide');
-                        $('#approvalRemarks').val('');
-                        showSuccess(response.message);
+                        if (response.isFullyApproved && response.sageResponse) {
+                            showSageResponseModal(response.sageResponse, response.message);
+                        } else {
+                            alert(response.message);
+                        }
                         loadPendingApprovals();
                     } else {
-                        showError(response.message);
+                        alert('Error: ' + response.message);
                     }
                 },
                 error: function (xhr, status, error) {
-                    showError('Error processing approval: ' + error);
+                    $('#btnConfirmApprove').prop('disabled', false).html('<i class="bi bi-check-circle me-1"></i> Confirm Approve');
+                    $('#btnConfirmReject').prop('disabled', false).html('<i class="bi bi-x-circle me-1"></i> Confirm Reject');
+                    alert('Error processing approval: ' + error);
                 }
             });
         }
 
+        function showSageResponseModal(sageData, message) {
+            // Status badge
+            var isSuccess = sageData.status && sageData.status.toLowerCase() !== 'error';
+            var badgeClass = isSuccess ? 'bg-success' : 'bg-danger';
+            var badgeIcon = isSuccess ? 'bi-check-circle-fill' : 'bi-x-circle-fill';
+            $('#sageStatusBadge').html(
+                '<span class="badge ' + badgeClass + ' fs-6"><i class="bi ' + badgeIcon + ' me-1"></i>' +
+                (sageData.status || 'Unknown') + '</span>'
+            );
+
+            // Message
+            var msgHtml = '<div class="alert ' + (isSuccess ? 'alert-success' : 'alert-danger') + '">' +
+                '<strong>' + message + '</strong>';
+            if (sageData.message) {
+                msgHtml += '<br/><small>' + sageData.message + '</small>';
+            }
+            if (sageData.docNum) {
+                msgHtml += '<br/><small>Doc #: ' + sageData.docNum + '</small>';
+            }
+            msgHtml += '</div>';
+            $('#sageMessage').html(msgHtml);
+
+            // Request/Response JSON
+            try {
+                var reqObj = JSON.parse(sageData.rawRequest);
+                $('#sageRequestJson').text(JSON.stringify(reqObj, null, 2));
+            } catch (e) {
+                $('#sageRequestJson').text(sageData.rawRequest || 'N/A');
+            }
+            try {
+                var resObj = JSON.parse(sageData.rawResponse);
+                $('#sageResponseJson').text(JSON.stringify(resObj, null, 2));
+            } catch (e) {
+                $('#sageResponseJson').text(sageData.rawResponse || 'N/A');
+            }
+
+            // Collapse both sections by default
+            $('#sageRequestCollapse').removeClass('show');
+            $('#sageResponseCollapse').removeClass('show');
+
+            $('#sageResponseModal').modal('show');
+        }
+
         function formatDate(dateString) {
             if (!dateString) return '';
-            var date = new Date(dateString);
-            return date.toLocaleDateString('en-GB');
-        }
-
-        function showSuccess(message) {
-            alert(message);
-        }
-
-        function showError(message) {
-            alert(message);
+            // Handle ASP.NET /Date(ticks)/ format
+            if (typeof dateString === 'string' && dateString.indexOf('/Date(') > -1) {
+                var ticks = parseInt(dateString.replace(/\/Date\((-?\d+)\)\//, '$1'));
+                var date = new Date(ticks);
+            } else {
+                var date = new Date(dateString);
+            }
+            if (isNaN(date.getTime())) return '';
+            var day = ('0' + date.getDate()).slice(-2);
+            var month = ('0' + (date.getMonth() + 1)).slice(-2);
+            var year = date.getFullYear();
+            return day + '/' + month + '/' + year;
         }
     </script>
 }

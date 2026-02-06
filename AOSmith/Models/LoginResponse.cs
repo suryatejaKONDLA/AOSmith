@@ -36,5 +36,6 @@ namespace AOSmith.Models
         public string Email { get; set; }
         public string Department { get; set; }
         public bool IsApprover { get; set; }
+        public int ApprovalLevel { get; set; }
     }
 }

@@ -11,7 +11,8 @@ namespace AOSmith.Services
 {
     public class SageApiService
     {
-        private const string SageApiUrl = "https://sagetest.aosmith.in/Sage300.WebAPI2024/api/TransferEntry";
+        private const string SageTransferApiUrl = "https://sagetest.aosmith.in/Sage300.WebAPI2024/api/TransferEntry";
+        private const string SageAdjustmentApiUrl = "https://sagetest.aosmith.in/Sage300.WebAPI2024/api/AdjustmentEntry";
         private const string SageUserId = "ADMIN";
         private const string SagePassword = "Sage@123$";
         private const string SageCompanyId = "SMDAT";
@@ -43,7 +44,7 @@ namespace AOSmith.Services
                 jsonPayload = JsonConvert.SerializeObject(request, Formatting.Indented);
 
                 var content = new StringContent(jsonPayload, Encoding.UTF8, "application/json");
-                var httpResponse = await _httpClient.PostAsync(SageApiUrl, content);
+                var httpResponse = await _httpClient.PostAsync(SageTransferApiUrl, content);
 
                 var responseBody = await httpResponse.Content.ReadAsStringAsync();
 
@@ -123,6 +124,104 @@ namespace AOSmith.Services
                     Quantity = item.Qty,
                     Comments = $"Stock moved to {item.ToLocation?.Trim()} location for adjustment",
                     TransDetailOptFields = new List<SageOptField>()
+                }).ToList()
+            };
+
+            return request;
+        }
+
+        // ========== Adjustment Entry (RecType 12 - Stock Increase) ==========
+
+        public async Task<SageAdjustmentEntryResponse> SendAdjustmentEntryAsync(
+            List<ApprovalLineItem> lineItems,
+            DateTime transactionDate,
+            int recNumber,
+            string location)
+        {
+            string jsonPayload = "";
+            try
+            {
+                var request = BuildAdjustmentRequest(lineItems, transactionDate, recNumber, location);
+                jsonPayload = JsonConvert.SerializeObject(request, Formatting.Indented);
+
+                var content = new StringContent(jsonPayload, Encoding.UTF8, "application/json");
+                var httpResponse = await _httpClient.PostAsync(SageAdjustmentApiUrl, content);
+
+                var responseBody = await httpResponse.Content.ReadAsStringAsync();
+
+                SageAdjustmentEntryResponse sageResponse;
+                try
+                {
+                    sageResponse = JsonConvert.DeserializeObject<SageAdjustmentEntryResponse>(responseBody);
+                }
+                catch
+                {
+                    sageResponse = new SageAdjustmentEntryResponse
+                    {
+                        Status = httpResponse.IsSuccessStatusCode ? "Success" : "Error",
+                        Message = responseBody
+                    };
+                }
+
+                sageResponse.RawResponse = responseBody;
+                sageResponse.RawRequest = jsonPayload;
+
+                if (!httpResponse.IsSuccessStatusCode && string.IsNullOrEmpty(sageResponse.Status))
+                {
+                    sageResponse.Status = "Error";
+                    sageResponse.Message = $"HTTP {(int)httpResponse.StatusCode}: {httpResponse.ReasonPhrase}";
+                }
+
+                return sageResponse;
+            }
+            catch (TaskCanceledException)
+            {
+                return new SageAdjustmentEntryResponse
+                {
+                    Status = "Error",
+                    Message = "Sage API request timed out. Please try again.",
+                    RawResponse = "Request timed out after 60 seconds.",
+                    RawRequest = jsonPayload
+                };
+            }
+            catch (Exception ex)
+            {
+                return new SageAdjustmentEntryResponse
+                {
+                    Status = "Error",
+                    Message = $"Failed to connect to Sage API: {ex.Message}",
+                    RawResponse = ex.ToString(),
+                    RawRequest = jsonPayload
+                };
+            }
+        }
+
+        private SageAdjustmentEntryRequest BuildAdjustmentRequest(
+            List<ApprovalLineItem> lineItems,
+            DateTime transactionDate,
+            int recNumber,
+            string location)
+        {
+            var transDateStr = transactionDate.ToString("yyyy-MM-ddTHH:mm:ss");
+
+            var request = new SageAdjustmentEntryRequest
+            {
+                UserId = SageUserId,
+                Password = SagePassword,
+                CompanyId = SageCompanyId,
+                DocNum = $"ADJ{recNumber.ToString().PadLeft(6, '0')}",
+                Reference = $"INV-ADJ-{transactionDate:MMM-yyyy}".ToUpper(),
+                Location = location?.Trim(),
+                TransDate = transDateStr,
+                HdrDesc = $"Stock Increase adjustment #{recNumber} - Approved",
+                TransType = 1,
+                AdjHeaderOptFields = new List<SageOptField>(),
+                Items = lineItems.Select(item => new SageAdjustmentItem
+                {
+                    ItemNo = item.ItemCode?.Trim(),
+                    Quantity = item.Quantity,
+                    ExtCost = 0,
+                    AdjDetailOptFields = new List<SageOptField>()
                 }).ToList()
             };
 
