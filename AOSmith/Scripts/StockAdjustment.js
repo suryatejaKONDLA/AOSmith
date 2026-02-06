@@ -5,6 +5,7 @@
     // Global variables
     let gridData = [];
     let nextStockRecSno = 1;
+    let uploadedFiles = {};
 
     // Initialize on document ready
     $(document).ready(function () {
@@ -37,8 +38,176 @@
             validateLocations();
         });
 
-        // Submit button
-        $('#btnSubmit').on('click', function () {
+        // File upload change events
+        $('.file-upload').on('change', function () {
+            handleFileUpload($(this));
+        });
+
+        // Clear file button
+        $('.btn-clear-file').on('click', function () {
+            clearFile($(this).data('file-id'));
+        });
+
+        // Review Data button
+        $('#btnReviewData').on('click', function () {
+            reviewData();
+        });
+    }
+
+    // Handle file upload
+    function handleFileUpload($input) {
+        const fileTypeId = $input.data('file-type');
+        const maxSize = $input.data('max-size'); // in KB
+        const file = $input[0].files[0];
+
+        if (!file) {
+            return;
+        }
+
+        // Validate file size
+        const fileSizeKB = file.size / 1024;
+        if (fileSizeKB > maxSize) {
+            showAlert(`File size exceeds maximum limit of ${maxSize / 1024} MB`, 'warning');
+            $input.val('');
+            return;
+        }
+
+        // Store file
+        uploadedFiles[fileTypeId] = file;
+
+        // Show file name
+        $('#fileName_' + fileTypeId).text(file.name + ' (' + (fileSizeKB / 1024).toFixed(2) + ' MB)');
+
+        // Show clear button
+        $('.btn-clear-file[data-file-id="' + fileTypeId + '"]').show();
+    }
+
+    // Clear file
+    function clearFile(fileTypeId) {
+        delete uploadedFiles[fileTypeId];
+        $('#file_' + fileTypeId).val('');
+        $('#fileName_' + fileTypeId).text('');
+        $('.btn-clear-file[data-file-id="' + fileTypeId + '"]').hide();
+    }
+
+    // Review Data
+    function reviewData() {
+        // Validate grid data
+        if (gridData.length === 0) {
+            showAlert('Please add at least one item', 'warning');
+            return;
+        }
+
+        // Validate required files
+        let missingFiles = [];
+        $('.file-upload').each(function () {
+            const $input = $(this);
+            const isRequired = $input.data('required') === true || $input.data('required') === 'true';
+            const fileTypeId = $input.data('file-type');
+            const label = $input.closest('.mb-3').find('label').text().trim();
+
+            if (isRequired && !uploadedFiles[fileTypeId]) {
+                missingFiles.push(label.split('*')[0].trim());
+            }
+        });
+
+        if (missingFiles.length > 0) {
+            showAlert('Please upload required files: ' + missingFiles.join(', '), 'warning');
+            return;
+        }
+
+        // Show review modal or navigate to review page
+        showReviewModal();
+    }
+
+    // Show Review Modal
+    function showReviewModal() {
+        // Build review data HTML
+        let itemsHtml = '';
+        gridData.forEach(function (item, index) {
+            itemsHtml += `
+                <tr>
+                    <td>${index + 1}</td>
+                    <td>${item.itemCode}</td>
+                    <td>${item.itemDescription}</td>
+                    <td>${item.fromLocationName}</td>
+                    <td>${item.toLocationName}</td>
+                    <td>${item.recTypeName}</td>
+                    <td>${item.qty.toFixed(3)}</td>
+                </tr>
+            `;
+        });
+
+        let filesHtml = '';
+        for (let fileTypeId in uploadedFiles) {
+            const file = uploadedFiles[fileTypeId];
+            filesHtml += `<li>${file.name} (${(file.size / 1024 / 1024).toFixed(2)} MB)</li>`;
+        }
+
+        const reviewHtml = `
+            <div class="modal fade" id="reviewModal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false">
+                <div class="modal-dialog modal-xl">
+                    <div class="modal-content">
+                        <div class="modal-header bg-primary text-white">
+                            <h5 class="modal-title"><i class="bi bi-eye-fill me-2"></i>Review Stock Adjustment</h5>
+                        </div>
+                        <div class="modal-body p-4">
+                            <h6 class="fw-bold mb-3">Transaction Details</h6>
+                            <div class="row mb-4">
+                                <div class="col-md-6">
+                                    <p><strong>Request Date:</strong> ${$('#requestDate').val()}</p>
+                                </div>
+                                <div class="col-md-6">
+                                    <p><strong>Requestor:</strong> ${$('#requestor').val()}</p>
+                                </div>
+                            </div>
+
+                            <h6 class="fw-bold mb-3">Items (${gridData.length})</h6>
+                            <div class="table-responsive mb-4">
+                                <table class="table table-bordered table-sm">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th>Sr No</th>
+                                            <th>Item Code</th>
+                                            <th>Description</th>
+                                            <th>From Location</th>
+                                            <th>To Location</th>
+                                            <th>Type</th>
+                                            <th>Qty</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>${itemsHtml}</tbody>
+                                </table>
+                            </div>
+
+                            <h6 class="fw-bold mb-3">Attachments (${Object.keys(uploadedFiles).length})</h6>
+                            <ul class="list-unstyled">${filesHtml}</ul>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                                <i class="bi bi-arrow-left me-2"></i>Back to Edit
+                            </button>
+                            <button type="button" class="btn btn-success" id="btnConfirmSubmit">
+                                <i class="bi bi-check-circle me-2"></i>Confirm & Submit
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        // Remove existing review modal if any
+        $('#reviewModal').remove();
+
+        // Add review modal to body
+        $('body').append(reviewHtml);
+
+        // Show modal
+        var reviewModal = new bootstrap.Modal(document.getElementById('reviewModal'));
+        reviewModal.show();
+
+        // Handle confirm submit
+        $('#btnConfirmSubmit').on('click', function () {
             submitStockAdjustment();
         });
     }
@@ -244,78 +413,89 @@
         }
     };
 
-    // Submit stock adjustment
+    // Submit stock adjustment (called from review modal)
     function submitStockAdjustment() {
-        if (gridData.length === 0) {
-            showAlert('Please add at least one item', 'warning');
-            return;
-        }
+        // Prepare FormData for file upload
+        const formData = new FormData();
 
-        const data = {
-            transactionDate: new Date($('#requestDate').val()),
-            lineItems: gridData.map(function (item) {
-                return {
-                    stockRecSno: item.stockRecSno,
-                    recType: item.recType,
-                    fromLocation: item.fromLocation,
-                    toLocation: item.toLocation,
-                    itemCode: item.itemCode,
-                    itemDescription: item.itemDescription,
-                    qty: item.qty
-                };
-            })
-        };
+        // Add transaction data
+        formData.append('transactionDate', $('#requestDate').val());
+
+        // Add line items as JSON
+        formData.append('lineItemsJson', JSON.stringify(gridData.map(function (item) {
+            return {
+                stockRecSno: item.stockRecSno,
+                recType: item.recType,
+                fromLocation: item.fromLocation,
+                toLocation: item.toLocation,
+                itemCode: item.itemCode,
+                itemDescription: item.itemDescription,
+                qty: item.qty
+            };
+        })));
+
+        // Add files
+        for (let fileTypeId in uploadedFiles) {
+            formData.append('file_' + fileTypeId, uploadedFiles[fileTypeId]);
+        }
 
         $.ajax({
             url: '/StockAdjustment/SaveStockAdjustment',
             type: 'POST',
-            contentType: 'application/json',
-            data: JSON.stringify(data),
+            data: formData,
+            processData: false,
+            contentType: false,
             beforeSend: function () {
-                $('#btnSubmit').prop('disabled', true).html('<i class="fas fa-spinner fa-spin"></i> Saving...');
+                $('#btnConfirmSubmit').prop('disabled', true).html('<i class="bi bi-hourglass-split me-2"></i> Saving...');
             },
             success: function (response) {
                 if (response.success) {
+                    // Close review modal
+                    var reviewModalEl = document.getElementById('reviewModal');
+                    var reviewModal = bootstrap.Modal.getInstance(reviewModalEl);
+                    reviewModal.hide();
+
                     showAlert('Stock adjustment saved successfully!', 'success');
+
+                    // Reset form after 2 seconds
                     setTimeout(function () {
-                        window.location.href = '/Home/Index';
-                    }, 1500);
+                        window.location.reload();
+                    }, 2000);
                 } else {
                     showAlert(response.message || 'Failed to save stock adjustment', 'error');
-                    $('#btnSubmit').prop('disabled', false).html('<i class="fas fa-save"></i> Submit Request');
+                    $('#btnConfirmSubmit').prop('disabled', false).html('<i class="bi bi-check-circle me-2"></i>Confirm & Submit');
                 }
             },
             error: function () {
                 showAlert('An error occurred while saving', 'error');
-                $('#btnSubmit').prop('disabled', false).html('<i class="fas fa-save"></i> Submit Request');
+                $('#btnConfirmSubmit').prop('disabled', false).html('<i class="bi bi-check-circle me-2"></i>Confirm & Submit');
             }
         });
     }
 
-    // Show alert message
+    // Show toast notification
     function showAlert(message, type) {
-        const alertClass = type === 'success' ? 'alert-success' : type === 'warning' ? 'alert-warning' : 'alert-danger';
-        const icon = type === 'success' ? 'fa-check-circle' : type === 'warning' ? 'fa-exclamation-triangle' : 'fa-times-circle';
-        
-        const alertHtml = `
-            <div class="alert ${alertClass} alert-dismissible fade show" role="alert">
-                <i class="fas ${icon}"></i> ${message}
-                <button type="button" class="close" data-dismiss="alert" aria-label="Close">
-                    <span aria-hidden="true">&times;</span>
-                </button>
-            </div>
-        `;
+        let toastEl, toastMessage, toastInstance;
 
-        // Remove existing alerts
-        $('.alert').remove();
+        if (type === 'success') {
+            toastEl = document.getElementById('successToast');
+            toastMessage = document.getElementById('successToastMessage');
+        } else if (type === 'warning') {
+            toastEl = document.getElementById('warningToast');
+            toastMessage = document.getElementById('warningToastMessage');
+        } else {
+            toastEl = document.getElementById('errorToast');
+            toastMessage = document.getElementById('errorToastMessage');
+        }
 
-        // Add new alert at top of card body
-        $('.card-body').prepend(alertHtml);
+        // Set message
+        toastMessage.textContent = message;
 
-        // Auto-dismiss after 5 seconds
-        setTimeout(function () {
-            $('.alert').alert('close');
-        }, 5000);
+        // Show toast
+        toastInstance = new bootstrap.Toast(toastEl, {
+            delay: type === 'success' ? 3000 : type === 'warning' ? 4000 : 5000
+        });
+        toastInstance.show();
     }
 
 })();

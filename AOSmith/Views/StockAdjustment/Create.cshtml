@@ -66,15 +66,58 @@
                         </div>
                     </div>
 
-                    <!-- Submit Section -->
+                    <!-- File Attachments Section -->
                     <div class="row mt-4">
                         <div class="col-12">
-                            <button type="button" class="btn btn-primary btn-lg" id="btnSubmit">
-                                <i class="fas fa-save"></i> Submit Request
+                            <h5 class="mb-3">
+                                <i class="bi bi-paperclip"></i> Attachments
+                            </h5>
+                            <div class="card border-0 shadow-sm">
+                                <div class="card-body p-4">
+                                    <div class="row g-3">
+                                        @if (ViewBag.FileTypes != null)
+                                        {
+                                            foreach (var fileType in ViewBag.FileTypes)
+                                            {
+                                                <div class="col-md-6">
+                                                    <div class="mb-3">
+                                                        <label class="form-label fw-semibold">
+                                                            @fileType.FileTypeName
+                                                            @if (fileType.FileTypeRequired)
+                                                            {
+                                                                <span class="text-danger">*</span>
+                                                            }
+                                                            <small class="text-muted">(Max: @fileType.FileTypeMaxSizeMb MB)</small>
+                                                        </label>
+                                                        <div class="input-group">
+                                                            <input type="file" 
+                                                                   class="form-control file-upload" 
+                                                                   id="file_@fileType.FileTypeId" 
+                                                                   data-file-type="@fileType.FileTypeId"
+                                                                   data-required="@fileType.FileTypeRequired.ToString().ToLower()"
+                                                                   data-max-size="@(fileType.FileTypeMaxSizeMb * 1024)"
+                                                                   accept=".pdf,.jpg,.jpeg,.png,.doc,.docx,.xls,.xlsx">
+                                                            <button class="btn btn-outline-danger btn-clear-file" type="button" data-file-id="@fileType.FileTypeId" style="display:none;">
+                                                                <i class="bi bi-x-lg"></i>
+                                                            </button>
+                                                        </div>
+                                                        <small class="text-muted file-name" id="fileName_@fileType.FileTypeId"></small>
+                                                    </div>
+                                                </div>
+                                            }
+                                        }
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Review Data Button -->
+                    <div class="row mt-4">
+                        <div class="col-12 text-center">
+                            <button type="button" class="btn btn-primary btn-lg px-5" id="btnReviewData">
+                                <i class="bi bi-eye-fill me-2"></i> Review Data
                             </button>
-                            <a href="@Url.Action("Index", "Home")" class="btn btn-secondary btn-lg">
-                                <i class="fas fa-times"></i> Cancel
-                            </a>
                         </div>
                     </div>
                 </div>
@@ -156,6 +199,42 @@
                     <i class="bi bi-check-circle me-2"></i>Save Item
                 </button>
             </div>
+        </div>
+    </div>
+</div>
+
+<!-- TOAST NOTIFICATION CONTAINER -->
+<div class="toast-container position-fixed top-0 end-0 p-3" style="z-index: 9999">
+    <!-- Success Toast -->
+    <div id="successToast" class="toast align-items-center text-white bg-success border-0 shadow-lg" role="alert" aria-live="assertive" aria-atomic="true">
+        <div class="d-flex">
+            <div class="toast-body fw-semibold">
+                <i class="bi bi-check-circle-fill me-2"></i>
+                <span id="successToastMessage"></span>
+            </div>
+            <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+        </div>
+    </div>
+
+    <!-- Warning Toast -->
+    <div id="warningToast" class="toast align-items-center text-white bg-warning border-0 shadow-lg" role="alert" aria-live="assertive" aria-atomic="true">
+        <div class="d-flex">
+            <div class="toast-body fw-semibold">
+                <i class="bi bi-exclamation-triangle-fill me-2"></i>
+                <span id="warningToastMessage"></span>
+            </div>
+            <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+        </div>
+    </div>
+
+    <!-- Error Toast -->
+    <div id="errorToast" class="toast align-items-center text-white bg-danger border-0 shadow-lg" role="alert" aria-live="assertive" aria-atomic="true">
+        <div class="d-flex">
+            <div class="toast-body fw-semibold">
+                <i class="bi bi-x-circle-fill me-2"></i>
+                <span id="errorToastMessage"></span>
+            </div>
+            <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
         </div>
     </div>
 </div>

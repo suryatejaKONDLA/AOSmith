@@ -29,6 +29,7 @@ namespace AOSmith.Controllers
             };
 
             await LoadDropdowns();
+            await LoadFileTypes();
             return View(model);
         }
 
@@ -48,6 +49,13 @@ namespace AOSmith.Controllers
             var items = await _dbHelper.QueryAsync<ItemMaster>(
                 "SELECT ITEMNO, [DESC] AS SDESCRIPT FROM Item_Master ORDER BY [DESC]");
             ViewBag.Items = new SelectList(items, "ITEMNO", "SDESCRIPT");
+        }
+
+        private async Task LoadFileTypes()
+        {
+            var fileTypes = await _dbHelper.QueryAsync<FileTypeMaster>(
+                "SELECT * FROM [dbo].[File_Type_Master] ORDER BY [File_Type_ID]");
+            ViewBag.FileTypes = fileTypes;
         }
 
         [HttpPost]
