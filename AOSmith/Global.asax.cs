@@ -1,10 +1,7 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Web;
-using System.Web.Mvc;
+﻿using System.Web.Mvc;
 using System.Web.Optimization;
 using System.Web.Routing;
+using Dapper;
 
 namespace AOSmith
 {
@@ -16,6 +13,9 @@ namespace AOSmith
             FilterConfig.RegisterGlobalFilters(GlobalFilters.Filters);
             RouteConfig.RegisterRoutes(RouteTable.Routes);
             BundleConfig.RegisterBundles(BundleTable.Bundles);
+
+            // Dapper: Auto-map Login_Name -> LoginName, Login_ID -> LoginId, etc.
+            DefaultTypeMap.MatchNamesWithUnderscores = true;
         }
     }
 }

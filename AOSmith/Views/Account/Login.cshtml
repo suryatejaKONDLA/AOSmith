@@ -1,0 +1,215 @@
+@model AOSmith.Models.LoginRequest
+@{
+    Layout = null;
+}
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Login - AOSmith Enterprise</title>
+
+    <!-- Bootstrap 5 CSS (Local) -->
+    <link href="@Url.Content("~/Content/bootstrap.css")" rel="stylesheet">
+    <!-- Custom Site Overrides (Primary Color) -->
+    <link href="@Url.Content("~/Content/Site.css")" rel="stylesheet">
+    <!-- Bootstrap Icons (CDN) -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+
+    <!-- Google Fonts: Outfit -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        /* Floating Animation */
+        @@keyframes float {
+            0% { transform: translateY(0px); }
+            50% { transform: translateY(-15px); }
+            100% { transform: translateY(0px); }
+        }
+
+        .animate-float {
+            animation: float 6s ease-in-out infinite;
+        }
+
+        /* Gradient Background */
+        .bg-custom-gradient {
+            background: linear-gradient(135deg, var(--bs-primary) 0%, #000000 100%);
+        }
+    </style>
+</head>
+<body style="font-family: 'Outfit', sans-serif;">
+
+    <div class="container-fluid p-0 min-vh-100">
+        <div class="row g-0 min-vh-100">
+
+            <!-- LEFT PANEL: Branding (Hidden on Mobile) -->
+            <div class="col-lg-7 d-none d-lg-flex flex-column justify-content-center align-items-center position-relative text-white bg-custom-gradient overflow-hidden">
+
+                <!-- Background Decoration (Subtle Glow) -->
+                <div class="position-absolute translate-middle start-50 top-50 rounded-circle"
+                     style="width: 600px; height: 600px; background: radial-gradient(circle, rgba(255,255,255,0.05) 0%, rgba(0,0,0,0) 70%); pointer-events: none;"></div>
+
+                <!-- Centered Logo with Animation -->
+                <img src="@Url.Content("~/Content/Images/login-logo.png")"
+                     alt="AO Smith Logo"
+                     class="img-fluid animate-float position-relative"
+                     style="max-width: 65%; z-index: 2; filter: drop-shadow(0 20px 40px rgba(0,0,0,0.3));">
+
+                <!-- Bottom Text -->
+                <div class="position-absolute bottom-0 start-0 w-100 p-5 text-center" style="z-index: 2; opacity: 0.8;">
+                   <p class="mb-0 text-white-50 small ls-2 text-uppercase" style="letter-spacing: 3px;">Innovation has a name</p>
+                </div>
+            </div>
+
+            <!-- RIGHT PANEL: Login Form -->
+            <div class="col-lg-5 d-flex flex-column justify-content-center align-items-center bg-white p-5">
+
+                <div class="w-100" style="max-width: 400px;">
+
+                    <!-- Mobile Logo (Visible only on Mobile) -->
+                    <div class="d-lg-none text-center mb-5">
+                        <div class="d-inline-block mb-3">
+                             <img src="@Url.Content("~/Content/Images/login-logo.png")" alt="Logo" class="img-fluid" style="max-height: 60px;">
+                        </div>
+                        <h3 class="fw-bold text-dark">AO SMITH ERP</h3>
+                    </div>
+
+                    <!-- Header -->
+                    <div class="mb-4">
+                        <h2 class="fw-bolder text-dark mb-1">Welcome Back</h2>
+                        <h4 class="text-primary fw-bold text-uppercase mb-2" style="letter-spacing: 1px;">USER LOGIN</h4>
+                        <p class="text-muted small">Please sign in to your dashboard.</p>
+                    </div>
+
+                    <!-- Form with Bootstrap Custom Validation -->
+                    @using (Html.BeginForm("Login", "Account", FormMethod.Post, new { @class = "needs-validation", novalidate = "novalidate" }))
+                    {
+                        @Html.AntiForgeryToken()
+
+                        <div class="mb-3">
+                            @Html.LabelFor(m => m.Username, new { @class = "form-label fw-semibold" })
+                            @Html.TextBoxFor(m => m.Username, new { @class = "form-control w-100", placeholder = "Enter your username", required = "required" })
+                        </div>
+
+                        <div class="mb-3">
+                            @Html.LabelFor(m => m.Password, new { @class = "form-label fw-semibold" })
+                            @Html.PasswordFor(m => m.Password, new { @class = "form-control w-100", placeholder = "Enter your password", required = "required" })
+                        </div>
+
+                        <div class="d-flex justify-content-between align-items-center mb-4">
+                        </div>
+
+                        <button type="submit" class="btn btn-primary w-100 fw-bold mb-4">Sign In</button>
+                    }
+
+                    <!-- Footer -->
+                    <div class="text-center pt-4 border-top">
+                        <small class="text-muted d-block mb-1" style="font-size: 0.7rem;">POWERED BY</small>
+                        <div class="d-flex align-items-center justify-content-center gap-2 text-secondary fw-semibold" style="font-size: 0.8rem;">
+                            <i class="bi bi-shield-check"></i> AOSmith Enterprise
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+    <!-- TOAST NOTIFICATION CONTAINER -->
+    <div class="toast-container position-fixed top-0 end-0 p-3" style="z-index: 1055">
+        <!-- Error Toast -->
+        <div id="errorToast" class="toast align-items-center text-white bg-danger border-0 shadow-lg" role="alert" aria-live="assertive" aria-atomic="true">
+            <div class="d-flex">
+                <div class="toast-body fw-semibold">
+                    <i class="bi bi-exclamation-triangle-fill me-2"></i>
+                    <span id="errorToastMessage"></span>
+                </div>
+                <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+            </div>
+        </div>
+
+        <!-- Success Toast -->
+        <div id="successToast" class="toast align-items-center text-white bg-success border-0 shadow-lg" role="alert" aria-live="assertive" aria-atomic="true">
+            <div class="d-flex">
+                <div class="toast-body fw-semibold">
+                    <i class="bi bi-check-circle-fill me-2"></i>
+                    <span id="successToastMessage"></span>
+                </div>
+                <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bootstrap 5 JS Bundle (Local) -->
+    <script src="@Url.Content("~/Scripts/bootstrap.bundle.js")"></script>
+
+    <!-- jQuery (required for ASP.NET MVC validation) -->
+    <script src="@Url.Content("~/Scripts/jquery-3.4.1.min.js")"></script>
+    <script src="@Url.Content("~/Scripts/jquery.validate.min.js")"></script>
+    <script src="@Url.Content("~/Scripts/jquery.validate.unobtrusive.min.js")"></script>
+
+    <script>
+        // Bootstrap 5 Custom Validation with Focus-Out (Blur) Validation
+        (function () {
+            'use strict'
+
+            // Fetch all the forms we want to apply custom Bootstrap validation styles to
+            var forms = document.querySelectorAll('.needs-validation')
+
+            // Loop over them and prevent submission
+            Array.prototype.slice.call(forms).forEach(function (form) {
+                // Validate on submit
+                form.addEventListener('submit', function (event) {
+                    if (!form.checkValidity()) {
+                        event.preventDefault()
+                        event.stopPropagation()
+                    }
+
+                    form.classList.add('was-validated')
+                }, false)
+
+                // Validate individual inputs on blur (focus out)
+                var inputs = form.querySelectorAll('input, select, textarea')
+                inputs.forEach(function (input) {
+                    input.addEventListener('blur', function () {
+                        // Check validity of individual input
+                        if (!input.checkValidity()) {
+                            input.classList.add('is-invalid')
+                            input.classList.remove('is-valid')
+                        } else {
+                            input.classList.remove('is-invalid')
+                            input.classList.add('is-valid')
+                        }
+                    })
+                })
+            })
+        })()
+
+        // Toast Notification Logic
+        document.addEventListener('DOMContentLoaded', function () {
+            var errorMessage = "@TempData["Error"]";
+            var successMessage = "@TempData["Success"]";
+
+            // Show error toast if error message exists
+            if (errorMessage && errorMessage.length > 0 && errorMessage !== "") {
+                var errorToastEl = document.getElementById('errorToast');
+                var errorToastBody = document.getElementById('errorToastMessage');
+                errorToastBody.textContent = errorMessage;
+                var errorToast = new bootstrap.Toast(errorToastEl, { delay: 5000 });
+                errorToast.show();
+            }
+
+            // Show success toast if success message exists
+            if (successMessage && successMessage.length > 0 && successMessage !== "") {
+                var successToastEl = document.getElementById('successToast');
+                var successToastBody = document.getElementById('successToastMessage');
+                successToastBody.textContent = successMessage;
+                var successToast = new bootstrap.Toast(successToastEl, { delay: 3000 });
+                successToast.show();
+            }
+        });
+    </script>
+</body>
+</html>

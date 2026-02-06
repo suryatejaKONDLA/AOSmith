@@ -5,16 +5,129 @@
     padding-right: 15px;
 }
 
-/* Override the default bootstrap behavior where horizontal description lists 
-   will truncate terms that are too long to fit in the left column 
+/* Override the default bootstrap behavior where horizontal description lists
+   will truncate terms that are too long to fit in the left column
 */
 .dl-horizontal dt {
     white-space: normal;
 }
 
 /* Set width on the form input elements since they're 100% wide by default */
+/*
 input,
 select,
 textarea {
     max-width: 280px;
+}
+*/
+
+/* ================================================== */
+/* GLOBAL BOOTSTRAP PRIMARY COLOR OVERRIDE            */
+/* AO Smith Green: #004d26                            */
+/* ================================================== */
+:root {
+    --bs-primary: #004d26;
+    --bs-primary-rgb: 0, 77, 38;
+    --bs-link-color: #004d26;
+    --bs-link-hover-color: #003d1e;
+}
+
+/* Button Primary */
+.btn-primary {
+    --bs-btn-bg: #004d26;
+    --bs-btn-border-color: #004d26;
+    --bs-btn-hover-bg: #003d1e;
+    --bs-btn-hover-border-color: #00381b;
+    --bs-btn-active-bg: #00381b;
+    --bs-btn-active-border-color: #003318;
+    --bs-btn-disabled-bg: #004d26;
+    --bs-btn-disabled-border-color: #004d26;
+    background-color: var(--bs-btn-bg);
+    border-color: var(--bs-btn-border-color);
+}
+
+/* Outline Primary */
+.btn-outline-primary {
+    --bs-btn-color: #004d26;
+    --bs-btn-border-color: #004d26;
+    --bs-btn-hover-bg: #004d26;
+    --bs-btn-hover-border-color: #004d26;
+    --bs-btn-active-bg: #004d26;
+    --bs-btn-active-border-color: #004d26;
+}
+
+/* Text/Background/Border Utility Overrides */
+.text-primary {
+    color: var(--bs-primary) !important;
+}
+
+.bg-primary {
+    background-color: var(--bs-primary) !important;
+}
+
+.border-primary {
+    border-color: var(--bs-primary) !important;
+}
+
+/* Form Focus State */
+.form-control:focus,
+.form-select:focus {
+    border-color: #004d26;
+    box-shadow: 0 0 0 0.25rem rgba(0, 77, 38, 0.25);
+}
+
+/* Checkbox/Radio */
+.form-check-input:checked {
+    background-color: #004d26;
+    border-color: #004d26;
+}
+
+/* ================================================== */
+/* HEADER USER DROPDOWN STYLING                       */
+/* ================================================== */
+.dropdown-toggle::after {
+    color: var(--bs-primary);
+}
+
+.dropdown-menu {
+    border: 1px solid rgba(0, 77, 38, 0.15);
+}
+
+.dropdown-item {
+    transition: all 0.2s ease;
+}
+
+.dropdown-item:hover {
+    background-color: rgba(0, 77, 38, 0.1);
+    color: var(--bs-primary);
+}
+
+.dropdown-item:active {
+    background-color: var(--bs-primary);
+    color: white;
+}
+
+/* ================================================== */
+/* SIDEBAR LINK HOVER EFFECTS                         */
+/* ================================================== */
+.sidebar .nav-link {
+    transition: all 0.2s ease;
+    border-radius: 0.25rem;
+    margin: 0.25rem 0.5rem;
+}
+
+.sidebar .nav-link:hover:not(.active) {
+    background-color: rgba(255, 255, 255, 0.1);
+    color: white !important;
+}
+
+.offcanvas .nav-link {
+    transition: all 0.2s ease;
+    border-radius: 0.25rem;
+    margin: 0.25rem 0.5rem;
+}
+
+.offcanvas .nav-link:hover:not(.active) {
+    background-color: rgba(255, 255, 255, 0.1);
+    color: white !important;
 }
