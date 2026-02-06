@@ -16,6 +16,8 @@ namespace AOSmith.Models
         public System.DateTime? LoginLastLoginDate2 { get; set; }
         public System.DateTime? LoginLastPasswordChangeDate { get; set; }
         public bool LoginEmailVerifiedFlag { get; set; }
+        public bool LoginIsApprover { get; set; }
+        public int? LoginApprovalLevel { get; set; }
         public bool LoginActiveFlag { get; set; }
         public int LoginCreatedId { get; set; }
         public System.DateTime LoginCreatedDate { get; set; }

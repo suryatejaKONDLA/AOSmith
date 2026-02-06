@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="15.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
   <PropertyGroup>
@@ -125,6 +125,7 @@
     <Compile Include="App_Start\RouteConfig.cs" />
     <Compile Include="Controllers\AccountController.cs" />
     <Compile Include="Controllers\HomeController.cs" />
+    <Compile Include="Controllers\StockAdjustmentController.cs" />
     <Compile Include="Filters\AuthFilter.cs" />
     <Compile Include="Global.asax.cs">
       <DependentUpon>Global.asax</DependentUpon>
@@ -133,8 +134,28 @@
     <Compile Include="Helpers\DbReturnResult.cs" />
     <Compile Include="Helpers\IDatabaseHelper.cs" />
     <Compile Include="Helpers\SessionHelper.cs" />
+    <Compile Include="Models\ApprovalStatusConstants.cs" />
+    <Compile Include="Models\ApprovalStatusConstants2.cs" />
+    <Compile Include="Models\ApprovalStatusMaster.cs" />
+    <Compile Include="Models\ApprovalStatusMaster2.cs" />
+    <Compile Include="Models\FileTypeMaster.cs" />
+    <Compile Include="Models\FileTypeMaster2.cs" />
+    <Compile Include="Models\FinancialYear.cs" />
+    <Compile Include="Models\ItemMaster.cs" />
+    <Compile Include="Models\LocationMaster.cs" />
     <Compile Include="Models\LoginRequest.cs" />
     <Compile Include="Models\LoginResponse.cs" />
+    <Compile Include="Models\RecTypeMaster.cs" />
+    <Compile Include="Models\StockAdjustment.cs" />
+    <Compile Include="Models\StockAdjustment2.cs" />
+    <Compile Include="Models\StockAdjustmentApproval.cs" />
+    <Compile Include="Models\StockAdjustmentApproval2.cs" />
+    <Compile Include="Models\StockAdjustmentFile.cs" />
+    <Compile Include="Models\StockAdjustmentFile2.cs" />
+    <Compile Include="Models\StockAdjustmentLineItem.cs" />
+    <Compile Include="Models\StockAdjustmentSaveModel.cs" />
+    <Compile Include="Models\StockAdjustmentViewModel.cs" />
+    <Compile Include="Models\StockAdjustmentViewModel2.cs" />
     <Compile Include="Models\User.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Services\AuthService.cs" />
@@ -165,8 +186,6 @@
     <Content Include="Scripts\bootstrap.esm.min.js" />
     <Content Include="Scripts\bootstrap.js" />
     <Content Include="Scripts\bootstrap.min.js" />
-    <Content Include="Models\README.md" />
-    <Content Include="HEADER_UPDATE_SUMMARY.md" />
     <Content Include="Database\AOSmith.7z" />
     <None Include="Scripts\jquery-3.7.1.intellisense.js" />
     <Content Include="Scripts\jquery-3.7.1.js" />
@@ -179,6 +198,7 @@
     <Content Include="Scripts\jquery.validate.unobtrusive.js" />
     <Content Include="Scripts\jquery.validate.unobtrusive.min.js" />
     <Content Include="Scripts\modernizr-2.8.3.js" />
+    <Content Include="Scripts\StockAdjustment.js" />
     <Content Include="Web.config" />
     <Content Include="Web.Debug.config">
       <DependentUpon>Web.config</DependentUpon>
@@ -191,9 +211,8 @@
     <Content Include="Views\Shared\Error.cshtml" />
     <Content Include="Views\Shared\_Layout.cshtml" />
     <Content Include="Views\Account\Login.cshtml" />
-    <Content Include="Views\Home\About.cshtml" />
-    <Content Include="Views\Home\Contact.cshtml" />
     <Content Include="Views\Home\Index.cshtml" />
+    <Content Include="Views\StockAdjustment\Create.cshtml" />
   </ItemGroup>
   <ItemGroup>
     <Folder Include="App_Data\" />

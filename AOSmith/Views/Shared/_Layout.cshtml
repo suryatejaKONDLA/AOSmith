@@ -35,10 +35,10 @@
                             </a>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link @(ViewContext.RouteData.Values["Action"].ToString() == "InventoryAdjustments" ? "active bg-primary text-white" : "text-secondary")"
-                               href="@Url.Action("InventoryAdjustments", "Home")">
+                            <a class="nav-link @(ViewContext.RouteData.Values["Controller"].ToString() == "StockAdjustment" ? "active bg-primary text-white" : "text-secondary")"
+                               href="@Url.Action("Create", "StockAdjustment")">
                                 <i class="bi bi-box-seam me-2"></i>
-                                Inventory Adjustments
+                                Stock Adjustment
                             </a>
                         </li>
                     </ul>
@@ -61,10 +61,10 @@
                             </a>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link @(ViewContext.RouteData.Values["Action"].ToString() == "InventoryAdjustments" ? "active bg-primary text-white" : "text-secondary")"
-                               href="@Url.Action("InventoryAdjustments", "Home")">
+                            <a class="nav-link @(ViewContext.RouteData.Values["Controller"].ToString() == "StockAdjustment" ? "active bg-primary text-white" : "text-secondary")"
+                               href="@Url.Action("Create", "StockAdjustment")">
                                 <i class="bi bi-box-seam me-2"></i>
-                                Inventory Adjustments
+                                Stock Adjustment
                             </a>
                         </li>
                     </ul>
@@ -122,7 +122,7 @@
     </div>
 
     <!-- jQuery (Local) -->
-    <script src="@Url.Content("~/Scripts/jquery-3.7.0.js")"></script>
+    <script src="@Url.Content("~/Scripts/jquery-3.7.1.min.js")"></script>
 
     <!-- Bootstrap 5 JS Bundle (Local) -->
     <script src="@Url.Content("~/Scripts/bootstrap.bundle.js")"></script>

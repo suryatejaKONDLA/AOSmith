@@ -1,0 +1,165 @@
+@model AOSmith.Models.StockAdjustmentViewModel
+@{
+    ViewBag.Title = "Inventory Adjustment Request";
+    Layout = "~/Views/Shared/_Layout.cshtml";
+}
+
+<div class="container-fluid mt-4">
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h4 class="mb-0">
+                        <i class="fas fa-boxes"></i> Inventory Adjustment Request
+                    </h4>
+                </div>
+                <div class="card-body">
+                    <!-- Header Section -->
+                    <div class="row mb-4">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label>Request Date</label>
+                                <input type="text" class="form-control" id="requestDate" value="@DateTime.Today.ToString("dd-MM-yyyy")" readonly />
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label>Requestor</label>
+                                <input type="text" class="form-control" id="requestor" value="@Model.CreatedBy" readonly />
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Add Item Button -->
+                    <div class="row mb-3">
+                        <div class="col-12">
+                            <button type="button" class="btn btn-success" id="btnAddItem">
+                                <i class="fas fa-plus"></i> Add Item
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Grid Section -->
+                    <div class="row">
+                        <div class="col-12">
+                            <div class="table-responsive">
+                                <table class="table table-bordered table-hover" id="itemsGrid">
+                                    <thead class="thead-light">
+                                        <tr>
+                                            <th style="width: 5%;">Sr No</th>
+                                            <th style="width: 12%;">Item Code</th>
+                                            <th style="width: 20%;">Item Description</th>
+                                            <th style="width: 12%;">From Location</th>
+                                            <th style="width: 12%;">To Location</th>
+                                            <th style="width: 15%;">Adjustment Type</th>
+                                            <th style="width: 10%;">Qty</th>
+                                            <th style="width: 14%;">Action</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="itemsTableBody">
+                                        <tr id="noDataRow">
+                                            <td colspan="8" class="text-center text-muted">No items added yet. Click "Add Item" to begin.</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Submit Section -->
+                    <div class="row mt-4">
+                        <div class="col-12">
+                            <button type="button" class="btn btn-primary btn-lg" id="btnSubmit">
+                                <i class="fas fa-save"></i> Submit Request
+                            </button>
+                            <a href="@Url.Action("Index", "Home")" class="btn btn-secondary btn-lg">
+                                <i class="fas fa-times"></i> Cancel
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Add/Edit Item Modal -->
+<div class="modal fade" id="itemModal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false" aria-labelledby="itemModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header bg-primary text-white border-0">
+                <h5 class="modal-title fw-bold" id="itemModalLabel">
+                    <i class="bi bi-plus-circle me-2"></i>Add Item
+                </h5>
+            </div>
+            <div class="modal-body p-4">
+                <form id="itemForm">
+                    <input type="hidden" id="editIndex" value="-1" />
+                    <input type="hidden" id="stockRecSno" value="0" />
+
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="modalRecType" class="form-label fw-semibold">Adjustment Type <span class="text-danger">*</span></label>
+                                @Html.DropDownList("RecType", (SelectList)ViewBag.RecTypes, "-- Select Type --", new { @class = "form-control form-select", id = "modalRecType", required = "required" })
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="modalItemCode" class="form-label fw-semibold">Item <span class="text-danger">*</span></label>
+                                @Html.DropDownList("ItemCode", (SelectList)ViewBag.Items, "-- Select Item --", new { @class = "form-control form-select", id = "modalItemCode", required = "required" })
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="modalFromLocation" class="form-label fw-semibold">From Location <span class="text-danger">*</span></label>
+                                @Html.DropDownList("FromLocation", (SelectList)ViewBag.Locations, "-- Select Location --", new { @class = "form-control form-select", id = "modalFromLocation", required = "required" })
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="modalToLocation" class="form-label fw-semibold">To Location <span class="text-danger">*</span></label>
+                                @Html.DropDownList("ToLocation", (SelectList)ViewBag.Locations, "-- Select Location --", new { @class = "form-control form-select", id = "modalToLocation", required = "required" })
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="modalQty" class="form-label fw-semibold">Quantity <span class="text-danger">*</span></label>
+                                <input type="number" class="form-control" id="modalQty" step="0.001" min="0.001" placeholder="Enter quantity" required />
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label class="form-label fw-semibold">Item Description</label>
+                                <input type="text" class="form-control bg-light" id="modalItemDesc" readonly />
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="alert alert-warning border-0 shadow-sm" id="locationMatchWarning" style="display:none;">
+                        <i class="bi bi-exclamation-triangle-fill me-2"></i> 
+                        <strong>Note:</strong> For this adjustment type, From and To locations must be the same.
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer border-0 bg-light p-3">
+                <button type="button" class="btn btn-secondary px-4" data-bs-dismiss="modal">
+                    <i class="bi bi-x-circle me-2"></i>Cancel
+                </button>
+                <button type="button" class="btn btn-primary px-4" id="btnSaveItem">
+                    <i class="bi bi-check-circle me-2"></i>Save Item
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script src="~/Scripts/StockAdjustment.js"></script>
+}

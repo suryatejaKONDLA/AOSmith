@@ -39,11 +39,5 @@ namespace AOSmith.Controllers
             ViewBag.Message = "Manage Users Page";
             return View();
         }
-
-        public ActionResult InventoryAdjustments()
-        {
-            ViewBag.Message = "Inventory Adjustments Page";
-            return View();
-        }
     }
 }
