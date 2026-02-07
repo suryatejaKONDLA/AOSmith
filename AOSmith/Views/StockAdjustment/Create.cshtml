@@ -90,9 +90,9 @@
                                                             <small class="text-muted">(Max: @fileType.FileTypeMaxSizeMb MB)</small>
                                                         </label>
                                                         <div class="input-group">
-                                                            <input type="file" 
-                                                                   class="form-control file-upload" 
-                                                                   id="file_@fileType.FileTypeId" 
+                                                            <input type="file"
+                                                                   class="form-control file-upload"
+                                                                   id="file_@fileType.FileTypeId"
                                                                    data-file-type="@fileType.FileTypeId"
                                                                    data-required="@fileType.FileTypeRequired.ToString().ToLower()"
                                                                    data-max-size="@(fileType.FileTypeMaxSizeMb * 1024)"
@@ -150,7 +150,9 @@
                         <div class="col-md-6">
                             <div class="form-group">
                                 <label for="modalItemCode" class="form-label fw-semibold">Item <span class="text-danger">*</span></label>
-                                @Html.DropDownList("ItemCode", (SelectList)ViewBag.Items, "-- Select Item --", new { @class = "form-control form-select", id = "modalItemCode", required = "required" })
+                                <select class="form-control form-select" id="modalItemCode" name="ItemCode" required>
+                                    <option value="">-- Loading Items... --</option>
+                                </select>
                             </div>
                         </div>
                     </div>
@@ -159,13 +161,17 @@
                         <div class="col-md-6">
                             <div class="form-group">
                                 <label for="modalFromLocation" class="form-label fw-semibold">From Location <span class="text-danger">*</span></label>
-                                @Html.DropDownList("FromLocation", (SelectList)ViewBag.Locations, "-- Select Location --", new { @class = "form-control form-select", id = "modalFromLocation", required = "required" })
+                                <select class="form-control form-select" id="modalFromLocation" name="FromLocation" required>
+                                    <option value="">-- Loading Locations... --</option>
+                                </select>
                             </div>
                         </div>
                         <div class="col-md-6">
                             <div class="form-group">
                                 <label for="modalToLocation" class="form-label fw-semibold">To Location <span class="text-danger">*</span></label>
-                                @Html.DropDownList("ToLocation", (SelectList)ViewBag.Locations, "-- Select Location --", new { @class = "form-control form-select", id = "modalToLocation", required = "required" })
+                                <select class="form-control form-select" id="modalToLocation" name="ToLocation" required>
+                                    <option value="">-- Loading Locations... --</option>
+                                </select>
                             </div>
                         </div>
                     </div>
@@ -186,7 +192,7 @@
                     </div>
 
                     <div class="alert alert-warning border-0 shadow-sm" id="locationMatchWarning" style="display:none;">
-                        <i class="bi bi-exclamation-triangle-fill me-2"></i> 
+                        <i class="bi bi-exclamation-triangle-fill me-2"></i>
                         <strong>Note:</strong> For this adjustment type, From and To locations must be the same.
                     </div>
                 </form>
@@ -242,3 +248,13 @@
 @section Scripts {
     <script src="~/Scripts/StockAdjustment.js"></script>
 }
+
+<!-- Global Loading Spinner Overlay -->
+<div id="globalSpinner" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(255,255,255,0.7); z-index:99999; justify-content:center; align-items:center;">
+    <div class="text-center">
+        <div class="spinner-border text-primary" style="width:3rem; height:3rem;" role="status">
+            <span class="visually-hidden">Loading...</span>
+        </div>
+        <p class="mt-2 fw-semibold text-primary" id="spinnerMessage">Loading...</p>
+    </div>
+</div>

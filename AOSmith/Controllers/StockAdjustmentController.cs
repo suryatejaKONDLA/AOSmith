@@ -38,15 +38,11 @@ namespace AOSmith.Controllers
                 "SELECT * FROM REC_Type_Master WHERE REC_Type IN (10, 12) ORDER BY REC_Order");
             ViewBag.RecTypes = new SelectList(recTypes, "REC_Type", "REC_Name2");
 
-            // Locations (RTRIM to remove trailing spaces from CHAR(6))
-            var locations = await _dbHelper.QueryAsync<LocationMaster>(
-                "SELECT RTRIM(LOCATION) as LOCATION, [DESC] FROM Location_Master WHERE INACTIVE = 0 ORDER BY [DESC]");
-            ViewBag.Locations = new SelectList(locations, "LOCATION", "DESC");
+            // Locations - fetched from Sage API at runtime via AJAX (no DB query needed)
+            ViewBag.Locations = new SelectList(new List<LocationMaster>(), "LOCATION", "DESC");
 
-            // Items
-            var items = await _dbHelper.QueryAsync<ItemMaster>(
-                "SELECT ITEMNO, [DESC] AS SDESCRIPT FROM Item_Master ORDER BY [DESC]");
-            ViewBag.Items = new SelectList(items, "ITEMNO", "SDESCRIPT");
+            // Items - fetched from Sage API at runtime via AJAX (no DB query needed)
+            ViewBag.Items = new SelectList(new List<ItemMaster>(), "ITEMNO", "SDESCRIPT");
         }
 
         private async Task LoadFileTypes()
@@ -59,16 +55,106 @@ namespace AOSmith.Controllers
         [HttpPost]
         public async Task<JsonResult> GetItemDetails(string itemCode)
         {
-            var item = await _dbHelper.QuerySingleAsync<ItemMaster>(
-                "SELECT ITEMNO, [DESC] AS SDESCRIPT FROM Item_Master WHERE ITEMNO = @itemCode",
-                new Dictionary<string, object> { { "@itemCode", itemCode } });
-
-            if (item != null)
+            try
             {
-                return Json(new { success = true, description = item.SDESCRIPT });
-            }
+                var response = await _sageService.GetItemsAsync();
+                if (response?.icitems != null)
+                {
+                    var item = response.icitems.FirstOrDefault(i =>
+                        string.Equals(i.itemno?.Trim(), itemCode?.Trim(), StringComparison.OrdinalIgnoreCase));
 
-            return Json(new { success = false });
+                    if (item != null)
+                    {
+                        return Json(new { success = true, description = item.desc?.Trim() });
+                    }
+                }
+
+                return Json(new { success = false });
+            }
+            catch (Exception ex)
+            {
+                return Json(new { success = false, message = ex.Message });
+            }
+        }
+
+        /// <summary>
+        /// Fetch items from Sage API with optional search term
+        /// </summary>
+        [HttpGet]
+        public async Task<JsonResult> SearchItems(string term)
+        {
+            try
+            {
+                var response = await _sageService.GetItemsAsync();
+                if (response?.icitems == null || !response.icitems.Any())
+                {
+                    var errorMsg = response?.Errors != null && response.Errors.Any()
+                        ? string.Join("; ", response.Errors)
+                        : "Failed to load items from Sage API";
+                    return Json(new { success = false, message = errorMsg }, JsonRequestBehavior.AllowGet);
+                }
+
+                var items = response.icitems
+                    .Where(i => !i.inactive)
+                    .Select(i => new
+                    {
+                        id = i.itemno?.Trim(),
+                        text = $"{i.itemno?.Trim()} - {i.desc?.Trim()}"
+                    });
+
+                // Apply search filter if term provided
+                if (!string.IsNullOrWhiteSpace(term))
+                {
+                    var searchTerm = term.Trim().ToLower();
+                    items = items.Where(i =>
+                        i.id.ToLower().Contains(searchTerm) ||
+                        i.text.ToLower().Contains(searchTerm));
+                }
+
+                return Json(new { success = true, results = items.OrderBy(i => i.text).ToList() }, JsonRequestBehavior.AllowGet);
+            }
+            catch (Exception ex)
+            {
+                return Json(new { success = false, message = ex.Message }, JsonRequestBehavior.AllowGet);
+            }
+        }
+
+        /// <summary>
+        /// Fetch locations from Sage API with optional search term
+        /// </summary>
+        [HttpGet]
+        public async Task<JsonResult> SearchLocations(string term)
+        {
+            try
+            {
+                var response = await _sageService.GetLocationsAsync();
+                if (response?.locations == null)
+                {
+                    return Json(new { success = false, message = "Failed to load locations from Sage API" }, JsonRequestBehavior.AllowGet);
+                }
+
+                var locations = response.locations
+                    .Select(l => new
+                    {
+                        id = l.location?.Trim(),
+                        text = $"{l.location?.Trim()} - {l.desc?.Trim()}"
+                    });
+
+                // Apply search filter if term provided
+                if (!string.IsNullOrWhiteSpace(term))
+                {
+                    var searchTerm = term.Trim().ToLower();
+                    locations = locations.Where(l =>
+                        l.id.ToLower().Contains(searchTerm) ||
+                        l.text.ToLower().Contains(searchTerm));
+                }
+
+                return Json(new { success = true, results = locations.OrderBy(l => l.text).ToList() }, JsonRequestBehavior.AllowGet);
+            }
+            catch (Exception ex)
+            {
+                return Json(new { success = false, message = ex.Message }, JsonRequestBehavior.AllowGet);
+            }
         }
 
         [HttpPost]
@@ -203,7 +289,7 @@ namespace AOSmith.Controllers
                     {
                         successMessages.Add(result.ResultMessage);
 
-                        // Only send RecType 10 (Stock Decrease) to Sage300
+                        // RecType 10 (Stock Decrease) → send to Sage Transfer Entry immediately
                         if (recType == 10)
                         {
                             var recNumber = ExtractRecNumber(result.ResultMessage);
@@ -223,6 +309,7 @@ namespace AOSmith.Controllers
                                 sageRawRequest = sageResponse.RawRequest
                             });
                         }
+                        // RecType 12 (Stock Increase) → DB only, Sage called after approval
                     }
                     else
                     {

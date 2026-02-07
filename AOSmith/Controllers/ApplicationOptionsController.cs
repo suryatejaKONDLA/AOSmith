@@ -5,9 +5,10 @@ using System.Data.SqlClient;
 using System.Linq;
 using System.Threading.Tasks;
 using System.Web.Mvc;
+using AOSmith.Filters;
 using AOSmith.Helpers;
 using AOSmith.Models;
-using AOSmith.Filters;
+using AOSmith.Services;
 
 namespace AOSmith.Controllers
 {
@@ -15,6 +16,7 @@ namespace AOSmith.Controllers
     public class ApplicationOptionsController : Controller
     {
         private readonly IDatabaseHelper _dbHelper = new DatabaseHelper();
+        private readonly SageApiService _sageService = new SageApiService();
 
         public async Task<ActionResult> Index()
         {
@@ -28,7 +30,7 @@ namespace AOSmith.Controllers
 
             // Load existing options (single record)
             var options = await LoadApplicationOptions();
-            
+
             // Load locations for dropdown
             await LoadLocationsDropdown();
 
@@ -37,7 +39,7 @@ namespace AOSmith.Controllers
 
         private async Task<ApplicationOptions> LoadApplicationOptions()
         {
-            const string sql = @"SELECT TOP 1 
+            const string sql = @"SELECT TOP 1
                             APP_ID as AppId,
                             RTRIM(APP_Default_Location) as AppDefaultLocation,
                             APP_Tran_Doc_Series as AppTranDocSeries,
@@ -56,9 +58,25 @@ namespace AOSmith.Controllers
 
         private async Task LoadLocationsDropdown()
         {
-            var locations = await _dbHelper.QueryAsync<LocationMaster>(
-                "SELECT RTRIM(LOCATION) as LOCATION, [DESC] FROM Location_Master WHERE INACTIVE = 0 ORDER BY [DESC]");
-            ViewBag.Locations = new SelectList(locations, "LOCATION", "DESC");
+            try
+            {
+                var response = await _sageService.GetLocationsAsync();
+                if (response?.locations != null)
+                {
+                    var locations = response.locations.Select(l => new LocationMaster
+                    {
+                        LOCATION = l.location?.Trim(),
+                        DESC = l.desc?.Trim()
+                    }).OrderBy(l => l.DESC).ToList();
+
+                    ViewBag.Locations = new SelectList(locations, "LOCATION", "DESC");
+                    return;
+                }
+            }
+            catch { }
+
+            // Fallback: empty list
+            ViewBag.Locations = new SelectList(new List<LocationMaster>(), "LOCATION", "DESC");
         }
 
         [HttpPost]

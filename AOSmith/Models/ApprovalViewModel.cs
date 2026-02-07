@@ -75,5 +75,6 @@ namespace AOSmith.Models
         public int ApprovedCount { get; set; }
         public int RejectedCount { get; set; }
         public int NextPendingLevel { get; set; }
+        public string RecTypeName { get; set; }
     }
 }

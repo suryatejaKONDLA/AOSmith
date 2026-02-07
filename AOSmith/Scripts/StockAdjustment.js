@@ -8,11 +8,143 @@
     let nextStockRecSno = 1;
     let uploadedFiles = {};
 
+    // Cached API data
+    let cachedItems = [];
+    let cachedLocations = [];
+    let itemsLoaded = false;
+    let locationsLoaded = false;
+
     // Initialize on document ready
     $(document).ready(function ()
     {
         initializeEvents();
+        loadMasterDataFromApi();
     });
+
+    // ==================== SPINNER HELPERS ====================
+
+    function showSpinner(message)
+    {
+        $('#spinnerMessage').text(message || 'Loading...');
+        $('#globalSpinner').css('display', 'flex');
+    }
+
+    function hideSpinner()
+    {
+        $('#globalSpinner').hide();
+    }
+
+    // ==================== LOAD MASTER DATA FROM SAGE API ====================
+
+    function loadMasterDataFromApi()
+    {
+        showSpinner('Loading items and locations from Sage...');
+
+        var itemsPromise = loadItemsFromApi();
+        var locationsPromise = loadLocationsFromApi();
+
+        $.when(itemsPromise, locationsPromise).always(function ()
+        {
+            hideSpinner();
+        });
+    }
+
+    function loadItemsFromApi()
+    {
+        return $.ajax({
+            url: '/StockAdjustment/SearchItems',
+            type: 'GET',
+            data: { term: '' },
+            success: function (response)
+            {
+                if (response.success && response.results)
+                {
+                    cachedItems = response.results;
+                    itemsLoaded = true;
+                    populateItemDropdown(cachedItems);
+                } else
+                {
+                    showAlert(response.message || 'Failed to load items from Sage API', 'error');
+                }
+            },
+            error: function ()
+            {
+                showAlert('Error connecting to Sage API for items', 'error');
+            }
+        });
+    }
+
+    function loadLocationsFromApi()
+    {
+        return $.ajax({
+            url: '/StockAdjustment/SearchLocations',
+            type: 'GET',
+            data: { term: '' },
+            success: function (response)
+            {
+                if (response.success && response.results)
+                {
+                    cachedLocations = response.results;
+                    locationsLoaded = true;
+                    populateLocationDropdowns(cachedLocations);
+                } else
+                {
+                    showAlert(response.message || 'Failed to load locations from Sage API', 'error');
+                }
+            },
+            error: function ()
+            {
+                showAlert('Error connecting to Sage API for locations', 'error');
+            }
+        });
+    }
+
+    function populateItemDropdown(items)
+    {
+        var $select = $('#modalItemCode');
+        $select.empty();
+        $select.append('<option value="">-- Select Item --</option>');
+
+        $.each(items, function (i, item)
+        {
+            $select.append('<option value="' + escapeHtml(item.id) + '">' + escapeHtml(item.text) + '</option>');
+        });
+    }
+
+    function populateLocationDropdowns(locations)
+    {
+        var $fromSelect = $('#modalFromLocation');
+        var $toSelect = $('#modalToLocation');
+
+        $fromSelect.empty();
+        $toSelect.empty();
+
+        $fromSelect.append('<option value="">-- Select Location --</option>');
+        $toSelect.append('<option value="">-- Select Location --</option>');
+
+        $.each(locations, function (i, loc)
+        {
+            var optionHtml = '<option value="' + escapeHtml(loc.id) + '">' + escapeHtml(loc.text) + '</option>';
+            $fromSelect.append(optionHtml);
+            $toSelect.append(optionHtml);
+        });
+    }
+
+    // Get display text for an item code from cached items
+    function getItemDisplayText(itemCode)
+    {
+        if (!itemCode) return '';
+        var found = cachedItems.find(function (i) { return i.id === itemCode; });
+        return found ? found.text : itemCode;
+    }
+
+    // Get display text for a location code from cached locations
+    function getLocationDisplayText(locationCode)
+    {
+        if (!locationCode) return '';
+        var found = cachedLocations.find(function (l) { return l.id === locationCode; });
+        return found ? found.text : locationCode;
+    }
 
     function initializeEvents()
     {
@@ -263,7 +395,7 @@
         myModal.show();
     }
 
-    // Load item description
+    // Load item description from cached items
     function loadItemDescription(itemCode)
     {
         if (!itemCode) {
@@ -271,20 +403,36 @@
             return;
         }
 
-        $.ajax({
-            url: '/StockAdjustment/GetItemDetails',
-            type: 'POST',
-            data: { itemCode: itemCode },
-            success: function (response)
-            {
-                if (response.success) {
-                    $('#modalItemDesc').val(response.description);
+        // Find from cached items
+        var found = cachedItems.find(function (i) { return i.id === itemCode; });
+        if (found)
+        {
+            // Extract just the description part (after "code - ")
+            var parts = found.text.split(' - ');
+            var desc = parts.length > 1 ? parts.slice(1).join(' - ') : found.text;
+            $('#modalItemDesc').val(desc);
+        } else
+        {
+            // Fallback: call API
+            showSpinner('Loading item details...');
+            $.ajax({
+                url: '/StockAdjustment/GetItemDetails',
+                type: 'POST',
+                data: { itemCode: itemCode },
+                success: function (response)
+                {
+                    if (response.success) {
+                        $('#modalItemDesc').val(response.description);
+                    }
+                },
+                error: function () {
+                    showAlert('Error loading item details', 'error');
+                },
+                complete: function () {
+                    hideSpinner();
                 }
-            },
-            error: function () {
-                showAlert('Error loading item details', 'error');
-            }
-        });
+            });
+        }
     }
 
     // Handle REC Type change
@@ -333,6 +481,7 @@
     // Load default location for Stock Decrease (REC Type 10)
     function loadDefaultLocationForStockDecrease()
     {
+        showSpinner('Loading default location...');
         $.ajax({
             url: '/StockAdjustment/GetDefaultLocation',
             type: 'POST',
@@ -350,6 +499,9 @@
             error: function () {
                 showAlert('Error loading default location', 'error');
                 $('#modalToLocation').prop('disabled', true).css('background-color', '#e9ecef');
+            },
+            complete: function () {
+                hideSpinner();
             }
         });
     }
@@ -509,6 +661,9 @@
             formData.append('file_' + fileTypeId, uploadedFiles[ fileTypeId ]);
         }
 
+        // Show global spinner
+        showSpinner('Submitting stock adjustment...');
+
         $.ajax({
             url: '/StockAdjustment/SaveStockAdjustment',
             type: 'POST',
@@ -520,6 +675,8 @@
             },
             success: function (response)
             {
+                hideSpinner();
+
                 if (response.success)
                 {
                     // Close review modal
@@ -550,6 +707,7 @@
                 }
             },
             error: function () {
+                hideSpinner();
                 showAlert('An error occurred while saving', 'error');
                 $('#btnConfirmSubmit').prop('disabled', false).html('<i class="bi bi-check-circle me-2"></i>Confirm & Submit');
             }

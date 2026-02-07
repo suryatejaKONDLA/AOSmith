@@ -168,6 +168,8 @@
     <Compile Include="Models\SageTransferEntryResponse.cs" />
     <Compile Include="Models\SageAdjustmentEntryRequest.cs" />
     <Compile Include="Models\SageAdjustmentEntryResponse.cs" />
+    <Compile Include="Models\SageItemResponse.cs" />
+    <Compile Include="Models\SageLocationResponse.cs" />
   </ItemGroup>
   <ItemGroup>
     <Content Include="Content\bootstrap-grid.css" />

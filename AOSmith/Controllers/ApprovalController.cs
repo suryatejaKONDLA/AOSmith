@@ -16,15 +16,18 @@ namespace AOSmith.Controllers
     public class ApprovalController : Controller
     {
         private readonly IDatabaseHelper _databaseHelper;
+        private readonly SageApiService _sageService;
 
         public ApprovalController()
         {
             _databaseHelper = new DatabaseHelper();
+            _sageService = new SageApiService();
         }
 
         public ApprovalController(IDatabaseHelper databaseHelper)
         {
             _databaseHelper = databaseHelper;
+            _sageService = new SageApiService();
         }
 
         // GET: Approval
@@ -48,16 +51,17 @@ namespace AOSmith.Controllers
                     return Json(new { success = false, message = "You do not have permission to view approvals." }, JsonRequestBehavior.AllowGet);
                 }
 
-                // 1. Get all RecType 12 documents with approval summary
+                // 1. Get all RecType 10 and 12 documents with approval summary
                 var documentsQuery = @"
                     SELECT DISTINCT
                         sa.Stock_FIN_Year AS FinYear,
-                        12 AS RecType,
+                        sa.Stock_REC_Type AS RecType,
                         sa.Stock_REC_Number AS RecNumber,
-                        CAST(sa.Stock_FIN_Year AS VARCHAR(10)) + '/STIN/' + CAST(sa.Stock_REC_Number AS VARCHAR(10)) AS DocumentReference,
+                        CAST(sa.Stock_FIN_Year AS VARCHAR(10)) + '/' + rm.REC_Name + '/' + CAST(sa.Stock_REC_Number AS VARCHAR(10)) AS DocumentReference,
                         sa.Stock_Date AS Date,
                         lm.Login_Name AS CreatedBy,
                         ISNULL(dm.DEPT_Name, '') AS Department,
+                        rm.REC_Name2 AS RecTypeName,
                         (SELECT COUNT(*) FROM Stock_Adjustment_Approval a
                          WHERE a.Approval_FIN_Year = sa.Stock_FIN_Year
                          AND a.Approval_REC_Type = sa.Stock_REC_Type
@@ -97,9 +101,10 @@ namespace AOSmith.Controllers
                     FROM Stock_Adjustment sa
                     INNER JOIN Login_Master lm ON sa.Stock_Created_ID = lm.Login_ID
                     LEFT JOIN DEPT_Master dm ON lm.Login_DEPT_Code = dm.DEPT_Code
-                    WHERE sa.Stock_REC_Type = 12
+                    INNER JOIN REC_Type_Master rm ON sa.Stock_REC_Type = rm.REC_Type
+                    WHERE sa.Stock_REC_Type IN (10, 12)
                     GROUP BY sa.Stock_FIN_Year, sa.Stock_REC_Type, sa.Stock_REC_Number,
-                             sa.Stock_Date, lm.Login_Name, dm.DEPT_Name
+                             sa.Stock_Date, lm.Login_Name, dm.DEPT_Name, rm.REC_Name, rm.REC_Name2
                     ORDER BY sa.Stock_Date DESC, sa.Stock_REC_Number DESC";
 
                 var documents = await _databaseHelper.QueryAsync<ApprovalDocumentRow>(documentsQuery);
@@ -109,7 +114,7 @@ namespace AOSmith.Controllers
                     return Json(new { success = true, data = new List<object>(), userApprovalLevel = userApprovalLevel }, JsonRequestBehavior.AllowGet);
                 }
 
-                // 2. Get all approval levels for RecType 12
+                // 2. Get all approval levels for RecType 10 and 12
                 var levelsQuery = @"
                     SELECT
                         a.Approval_FIN_Year AS FinYear,
@@ -125,12 +130,12 @@ namespace AOSmith.Controllers
                     FROM Stock_Adjustment_Approval a
                     INNER JOIN Approval_Status_Master asm ON a.Approval_Status = asm.Approval_Status_Code
                     LEFT JOIN Login_Master lm ON a.Approval_User_ID = lm.Login_ID
-                    WHERE a.Approval_REC_Type = 12
+                    WHERE a.Approval_REC_Type IN (10, 12)
                     ORDER BY a.Approval_FIN_Year, a.Approval_REC_Number, a.Approval_Level";
 
                 var levels = await _databaseHelper.QueryAsync<ApprovalLevelInfo>(levelsQuery);
 
-                // 3. Get all line items for RecType 12
+                // 3. Get all line items for RecType 10 and 12
                 var lineItemsQuery = @"
                     SELECT
                         sa.Stock_FIN_Year AS FinYear,
@@ -138,20 +143,20 @@ namespace AOSmith.Controllers
                         sa.Stock_REC_Number AS RecNumber,
                         sa.Stock_REC_SNO AS Sno,
                         RTRIM(sa.Stock_Item_Code) AS ItemCode,
-                        RTRIM(im.[DESC]) AS ItemDesc,
+                        '' AS ItemDesc,
                         RTRIM(sa.Stock_From_Location) AS FromLocation,
-                        RTRIM(lf.[DESC]) AS FromLocationName,
+                        '' AS FromLocationName,
                         RTRIM(sa.Stock_To_Location) AS ToLocation,
-                        RTRIM(lt.[DESC]) AS ToLocationName,
+                        '' AS ToLocationName,
                         sa.Stock_Qty AS Quantity
                     FROM Stock_Adjustment sa
-                    INNER JOIN Item_Master im ON sa.Stock_Item_Code = im.ITEMNO
-                    INNER JOIN Location_Master lf ON sa.Stock_From_Location = lf.LOCATION
-                    INNER JOIN Location_Master lt ON sa.Stock_To_Location = lt.LOCATION
-                    WHERE sa.Stock_REC_Type = 12
+                    WHERE sa.Stock_REC_Type IN (10, 12)
                     ORDER BY sa.Stock_FIN_Year, sa.Stock_REC_Number, sa.Stock_REC_SNO";
 
                 var lineItems = await _databaseHelper.QueryAsync<ApprovalLineItem>(lineItemsQuery);
+
+                // Resolve item and location names from Sage API
+                await ResolveNamesFromSageApi(lineItems);
 
                 // 4. Group everything together
                 var result = documents.Select(doc => new
@@ -169,7 +174,8 @@ namespace AOSmith.Controllers
                     doc.NextPendingLevel,
                     // User can approve if: their level == next pending level
                     CanApprove = doc.NextPendingLevel > 0 && doc.NextPendingLevel == userApprovalLevel,
-                    Levels = levels?.Where(l => l.FinYear == doc.FinYear && l.RecNumber == doc.RecNumber)
+                    doc.RecTypeName,
+                    Levels = levels?.Where(l => l.FinYear == doc.FinYear && l.RecType == doc.RecType && l.RecNumber == doc.RecNumber)
                         .OrderBy(l => l.Level)
                         .Select(l => new
                         {
@@ -180,7 +186,7 @@ namespace AOSmith.Controllers
                             l.ApprovalDate,
                             l.Comments
                         }).ToList(),
-                    LineItems = lineItems?.Where(li => li.FinYear == doc.FinYear && li.RecNumber == doc.RecNumber)
+                    LineItems = lineItems?.Where(li => li.FinYear == doc.FinYear && li.RecType == doc.RecType && li.RecNumber == doc.RecNumber)
                         .OrderBy(li => li.Sno)
                         .Select(li => new
                         {
@@ -205,7 +211,7 @@ namespace AOSmith.Controllers
 
         // POST: ProcessApproval
         [HttpPost]
-        public async Task<JsonResult> ProcessApproval(int finYear, int recNumber, string action, string remarks)
+        public async Task<JsonResult> ProcessApproval(int finYear, int recType, int recNumber, string action, string remarks)
         {
             try
             {
@@ -225,7 +231,7 @@ namespace AOSmith.Controllers
                         SELECT COUNT(*) AS Value
                         FROM Stock_Adjustment_Approval
                         WHERE Approval_FIN_Year = @FinYear
-                        AND Approval_REC_Type = 12
+                        AND Approval_REC_Type = @RecType
                         AND Approval_REC_Number = @RecNumber
                         AND Approval_Level < @UserLevel
                         AND Approval_Status != @ApprovedStatus";
@@ -233,6 +239,7 @@ namespace AOSmith.Controllers
                     var checkParams = new Dictionary<string, object>
                     {
                         { "@FinYear", finYear },
+                        { "@RecType", recType },
                         { "@RecNumber", recNumber },
                         { "@UserLevel", userApprovalLevel },
                         { "@ApprovedStatus", ApprovalStatusConstants.Approved }
@@ -251,13 +258,14 @@ namespace AOSmith.Controllers
                     SELECT Approval_Status AS Value
                     FROM Stock_Adjustment_Approval
                     WHERE Approval_FIN_Year = @FinYear
-                    AND Approval_REC_Type = 12
+                    AND Approval_REC_Type = @RecType
                     AND Approval_REC_Number = @RecNumber
                     AND Approval_Level = @UserLevel";
 
                 var statusCheckParams = new Dictionary<string, object>
                 {
                     { "@FinYear", finYear },
+                    { "@RecType", recType },
                     { "@RecNumber", recNumber },
                     { "@UserLevel", userApprovalLevel }
                 };
@@ -286,7 +294,7 @@ namespace AOSmith.Controllers
                         Approval_Date = @ApprovalDate,
                         Approval_Comments = @Comments
                     WHERE Approval_FIN_Year = @FinYear
-                    AND Approval_REC_Type = 12
+                    AND Approval_REC_Type = @RecType
                     AND Approval_REC_Number = @RecNumber
                     AND Approval_Level = @UserLevel";
 
@@ -297,6 +305,7 @@ namespace AOSmith.Controllers
                     { "@ApprovalDate", DateTime.Now },
                     { "@Comments", remarks ?? "" },
                     { "@FinYear", finYear },
+                    { "@RecType", recType },
                     { "@RecNumber", recNumber },
                     { "@UserLevel", userApprovalLevel }
                 };
@@ -308,21 +317,48 @@ namespace AOSmith.Controllers
                     ? $"Document approved at {levelLabel} successfully."
                     : $"Document rejected at {levelLabel}.";
 
-                // Check if all levels are now fully approved → trigger Sage API
-                SageAdjustmentEntryResponse sageResponse = null;
+                // On rejection → create reversal records (RecType 14) with swapped locations via SP
+                string reversalDocRef = null;
+                if (action.ToLower() == "reject")
+                {
+                    var reversalParams = new List<System.Data.SqlClient.SqlParameter>
+                    {
+                        new System.Data.SqlClient.SqlParameter("@OriginalFinYear", System.Data.SqlDbType.Int) { Value = finYear },
+                        new System.Data.SqlClient.SqlParameter("@OriginalRecType", System.Data.SqlDbType.Int) { Value = recType },
+                        new System.Data.SqlClient.SqlParameter("@OriginalRecNumber", System.Data.SqlDbType.Int) { Value = recNumber },
+                        new System.Data.SqlClient.SqlParameter("@Session_ID", System.Data.SqlDbType.Int) { Value = userId }
+                    };
+
+                    var reversalResult = await _databaseHelper.ExecuteStoredProcedureWithOutputsAsync(
+                        "dbo.StockAdjustment_Reversal", reversalParams);
+
+                    if (reversalResult.ResultVal == 1)
+                    {
+                        reversalDocRef = reversalResult.ResultMessage;
+                        message += $" {reversalResult.ResultMessage}";
+                    }
+                    else
+                    {
+                        message += $" Reversal creation failed: {reversalResult.ResultMessage}";
+                    }
+                }
+
+                // Check if all levels are now fully approved → trigger Sage Adjustment Entry API
+                SageAdjustmentEntryResponse sageAdjResponse = null;
                 if (action.ToLower() == "approve")
                 {
                     var fullyApprovedQuery = @"
                         SELECT COUNT(*) AS Value
                         FROM Stock_Adjustment_Approval
                         WHERE Approval_FIN_Year = @FinYear
-                        AND Approval_REC_Type = 12
+                        AND Approval_REC_Type = @RecType
                         AND Approval_REC_Number = @RecNumber
                         AND Approval_Status != @ApprovedStatus";
 
                     var fullyApprovedParams = new Dictionary<string, object>
                     {
                         { "@FinYear", finYear },
+                        { "@RecType", recType },
                         { "@RecNumber", recNumber },
                         { "@ApprovedStatus", ApprovalStatusConstants.Approved }
                     };
@@ -331,7 +367,7 @@ namespace AOSmith.Controllers
 
                     if (remainingCount != null && remainingCount.Value == 0)
                     {
-                        // All levels approved! Send to Sage Adjustment Entry API
+                        // All levels approved! Send to Sage API based on RecType
                         var lineItemsQuery = @"
                             SELECT
                                 sa.Stock_FIN_Year AS FinYear,
@@ -339,24 +375,22 @@ namespace AOSmith.Controllers
                                 sa.Stock_REC_Number AS RecNumber,
                                 sa.Stock_REC_SNO AS Sno,
                                 RTRIM(sa.Stock_Item_Code) AS ItemCode,
-                                RTRIM(im.[DESC]) AS ItemDesc,
+                                '' AS ItemDesc,
                                 RTRIM(sa.Stock_From_Location) AS FromLocation,
-                                RTRIM(lf.[DESC]) AS FromLocationName,
+                                '' AS FromLocationName,
                                 RTRIM(sa.Stock_To_Location) AS ToLocation,
-                                RTRIM(lt.[DESC]) AS ToLocationName,
+                                '' AS ToLocationName,
                                 sa.Stock_Qty AS Quantity
                             FROM Stock_Adjustment sa
-                            INNER JOIN Item_Master im ON sa.Stock_Item_Code = im.ITEMNO
-                            INNER JOIN Location_Master lf ON sa.Stock_From_Location = lf.LOCATION
-                            INNER JOIN Location_Master lt ON sa.Stock_To_Location = lt.LOCATION
                             WHERE sa.Stock_FIN_Year = @FinYear
-                            AND sa.Stock_REC_Type = 12
+                            AND sa.Stock_REC_Type = @RecType
                             AND sa.Stock_REC_Number = @RecNumber
                             ORDER BY sa.Stock_REC_SNO";
 
                         var lineItemParams = new Dictionary<string, object>
                         {
                             { "@FinYear", finYear },
+                            { "@RecType", recType },
                             { "@RecNumber", recNumber }
                         };
 
@@ -364,33 +398,33 @@ namespace AOSmith.Controllers
 
                         if (lineItems != null && lineItems.Any())
                         {
-                            // Get the transaction date and location from the first line item
+                            // Get the transaction date
                             var dateQuery = @"
                                 SELECT TOP 1 Stock_Date AS Value
                                 FROM Stock_Adjustment
                                 WHERE Stock_FIN_Year = @FinYear
-                                AND Stock_REC_Type = 12
+                                AND Stock_REC_Type = @RecType
                                 AND Stock_REC_Number = @RecNumber";
 
                             var dateRow = await _databaseHelper.QuerySingleAsync<DateResult>(dateQuery, lineItemParams);
                             var transDate = dateRow?.Value ?? DateTime.Now;
 
-                            // Use the ToLocation from first line item as the adjustment location
+                            var sageService = new SageApiService();
+
+                            // Both RecType 10 and 12 → Sage Adjustment Entry API after full approval
                             var location = lineItems.First().ToLocation;
 
-                            var sageService = new SageApiService();
-                            sageResponse = await sageService.SendAdjustmentEntryAsync(
+                            sageAdjResponse = await sageService.SendAdjustmentEntryAsync(
                                 lineItems, transDate, recNumber, location);
 
-                            // Update Sage sent status in Stock_Adjustment
-                            if (sageResponse.Status?.ToLower() != "error")
+                            if (sageAdjResponse.Status?.ToLower() != "error")
                             {
                                 var sageSentQuery = @"
                                     UPDATE Stock_Adjustment
                                     SET Stock_Sage_Data_Sent = 1,
                                         Stock_Sage_Sent_Date = GETDATE()
                                     WHERE Stock_FIN_Year = @FinYear
-                                    AND Stock_REC_Type = 12
+                                    AND Stock_REC_Type = @RecType
                                     AND Stock_REC_Number = @RecNumber";
 
                                 await _databaseHelper.ExecuteNonQueryAsync(sageSentQuery, lineItemParams);
@@ -401,24 +435,103 @@ namespace AOSmith.Controllers
                     }
                 }
 
+                // Build Sage response object
+                object sageResponseObj = null;
+                bool isFullyApproved = false;
+
+                if (sageAdjResponse != null)
+                {
+                    isFullyApproved = true;
+                    sageResponseObj = new
+                    {
+                        status = sageAdjResponse.Status,
+                        message = sageAdjResponse.Message,
+                        docNum = sageAdjResponse.DocNum,
+                        rawRequest = sageAdjResponse.RawRequest,
+                        rawResponse = sageAdjResponse.RawResponse
+                    };
+                }
+
                 return Json(new
                 {
                     success = true,
                     message = message,
-                    isFullyApproved = sageResponse != null,
-                    sageResponse = sageResponse != null ? new
-                    {
-                        status = sageResponse.Status,
-                        message = sageResponse.Message,
-                        docNum = sageResponse.DocNum,
-                        rawRequest = sageResponse.RawRequest,
-                        rawResponse = sageResponse.RawResponse
-                    } : null
+                    isFullyApproved = isFullyApproved,
+                    sageResponse = sageResponseObj
                 });
             }
             catch (Exception ex)
             {
                 return Json(new { success = false, message = ex.Message });
+            }
+        }
+
+        /// <summary>
+        /// Resolves item descriptions and location names from Sage API
+        /// </summary>
+        private async Task ResolveNamesFromSageApi(List<ApprovalLineItem> lineItems)
+        {
+            if (lineItems == null || !lineItems.Any()) return;
+
+            try
+            {
+                // Fetch items and locations from Sage API in parallel
+                var itemsTask = _sageService.GetItemsAsync();
+                var locationsTask = _sageService.GetLocationsAsync();
+                await Task.WhenAll(itemsTask, locationsTask);
+
+                var itemsResponse = await itemsTask;
+                var locationsResponse = await locationsTask;
+
+                // Build lookup dictionaries
+                var itemLookup = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+                if (itemsResponse?.icitems != null)
+                {
+                    foreach (var item in itemsResponse.icitems)
+                    {
+                        var key = item.itemno?.Trim();
+                        if (!string.IsNullOrEmpty(key) && !itemLookup.ContainsKey(key))
+                        {
+                            itemLookup[key] = item.desc?.Trim() ?? "";
+                        }
+                    }
+                }
+
+                var locationLookup = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+                if (locationsResponse?.locations != null)
+                {
+                    foreach (var loc in locationsResponse.locations)
+                    {
+                        var key = loc.location?.Trim();
+                        if (!string.IsNullOrEmpty(key) && !locationLookup.ContainsKey(key))
+                        {
+                            locationLookup[key] = loc.desc?.Trim() ?? "";
+                        }
+                    }
+                }
+
+                // Resolve names
+                foreach (var li in lineItems)
+                {
+                    if (!string.IsNullOrEmpty(li.ItemCode) && itemLookup.TryGetValue(li.ItemCode.Trim(), out var itemDesc))
+                    {
+                        li.ItemDesc = itemDesc;
+                    }
+
+                    if (!string.IsNullOrEmpty(li.FromLocation) && locationLookup.TryGetValue(li.FromLocation.Trim(), out var fromLocName))
+                    {
+                        li.FromLocationName = fromLocName;
+                    }
+
+                    if (!string.IsNullOrEmpty(li.ToLocation) && locationLookup.TryGetValue(li.ToLocation.Trim(), out var toLocName))
+                    {
+                        li.ToLocationName = toLocName;
+                    }
+                }
+            }
+            catch
+            {
+                // If API fails, leave names empty - codes are still shown
             }
         }
     }
