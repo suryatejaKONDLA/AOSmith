@@ -1,73 +1,561 @@
 @{
     ViewBag.Title = "Manage Users";
+    Layout = "~/Views/Shared/_Layout.cshtml";
 }
 
-<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
-    <h1 class="h2">Manage Users</h1>
-    <div class="btn-toolbar mb-2 mb-md-0">
-        <button type="button" class="btn btn-sm btn-outline-secondary dropdown-toggle">
-            <i class="bi bi-calendar"></i> This week
-        </button>
+<style>
+    .user-badge { font-size: 0.75rem; padding: 4px 8px; }
+    .table th { font-size: 0.85rem; white-space: nowrap; }
+    .table td { font-size: 0.85rem; vertical-align: middle; }
+    .action-btn { padding: 2px 8px; font-size: 0.78rem; }
+</style>
+
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h2 class="mb-0">
+                    <i class="bi bi-people me-2"></i>Manage Users
+                </h2>
+                <button class="btn btn-primary" onclick="openAddUserDialog()">
+                    <i class="bi bi-person-plus me-1"></i> Add User
+                </button>
+            </div>
+
+            <div class="card shadow-sm border-0">
+                <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">User List</h5>
+                    <button class="btn btn-sm btn-outline-light" onclick="loadUsers()">
+                        <i class="bi bi-arrow-clockwise me-1"></i> Refresh
+                    </button>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover table-bordered mb-0" id="usersTable">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>#</th>
+                                    <th>Username</th>
+                                    <th>Full Name</th>
+                                    <th>Email</th>
+                                    <th>Designation</th>
+                                    <th>Department</th>
+                                    <th>Mobile</th>
+                                    <th>Approver</th>
+                                    <th>Status</th>
+                                    <th style="width: 130px;">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="usersTableBody">
+                                <tr>
+                                    <td colspan="10" class="text-center py-4">
+                                        <div class="spinner-border text-primary" role="status">
+                                            <span class="visually-hidden">Loading...</span>
+                                        </div>
+                                        <p class="mt-2 mb-0">Loading users...</p>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 </div>
 
-<div class="table-responsive">
-    <table class="table table-striped table-sm">
-        <thead>
-            <tr>
-                <th scope="col">#</th>
-                <th scope="col">Username</th>
-                <th scope="col">Email</th>
-                <th scope="col">Role</th>
-                <th scope="col">Status</th>
-                <th scope="col">Actions</th>
-            </tr>
-        </thead>
-        <tbody>
-            <tr>
-                <td>1,001</td>
-                <td>jdoe</td>
-                <td>jdoe@example.com</td>
-                <td>Admin</td>
-                <td><span class="badge bg-success">Active</span></td>
-                <td>
-                    <button class="btn btn-sm btn-link"><i class="bi bi-pencil"></i></button>
-                    <button class="btn btn-sm btn-link text-danger"><i class="bi bi-trash"></i></button>
-                </td>
-            </tr>
-            <tr>
-                <td>1,002</td>
-                <td>asmith</td>
-                <td>asmith@example.com</td>
-                <td>User</td>
-                <td><span class="badge bg-success">Active</span></td>
-                <td>
-                    <button class="btn btn-sm btn-link"><i class="bi bi-pencil"></i></button>
-                    <button class="btn btn-sm btn-link text-danger"><i class="bi bi-trash"></i></button>
-                </td>
-            </tr>
-            <tr>
-                <td>1,003</td>
-                <td>rroe</td>
-                <td>rroe@example.com</td>
-                <td>Editor</td>
-                <td><span class="badge bg-warning text-dark">Pending</span></td>
-                <td>
-                    <button class="btn btn-sm btn-link"><i class="bi bi-pencil"></i></button>
-                    <button class="btn btn-sm btn-link text-danger"><i class="bi bi-trash"></i></button>
-                </td>
-            </tr>
-             <tr>
-                <td>1,004</td>
-                <td>luser</td>
-                <td>luser@example.com</td>
-                <td>User</td>
-                <td><span class="badge bg-secondary">Inactive</span></td>
-                <td>
-                    <button class="btn btn-sm btn-link"><i class="bi bi-pencil"></i></button>
-                    <button class="btn btn-sm btn-link text-danger"><i class="bi bi-trash"></i></button>
-                </td>
-            </tr>
-        </tbody>
-    </table>
+<!-- Add/Edit User Modal -->
+<div class="modal fade" id="userModal" tabindex="-1" aria-labelledby="userModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title" id="userModalLabel">
+                    <i class="bi bi-person-plus me-2"></i><span id="modalTitleText">Add User</span>
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="userForm">
+                    <input type="hidden" id="loginId" value="0" />
+
+                    <div class="row g-3">
+                        <!-- Username -->
+                        <div class="col-md-6">
+                            <label for="loginUser" class="form-label fw-semibold">
+                                Username <span class="text-danger">*</span>
+                            </label>
+                            <input type="text" class="form-control" id="loginUser" maxlength="100" required placeholder="Enter username" />
+                        </div>
+
+                        <!-- Full Name -->
+                        <div class="col-md-6">
+                            <label for="loginName" class="form-label fw-semibold">
+                                Full Name <span class="text-danger">*</span>
+                            </label>
+                            <input type="text" class="form-control" id="loginName" maxlength="40" required placeholder="Enter full name" />
+                        </div>
+
+                        <!-- Password -->
+                        <div class="col-md-6">
+                            <label for="loginPassword" class="form-label fw-semibold">
+                                Password <span class="text-danger">*</span>
+                            </label>
+                            <div class="input-group">
+                                <input type="password" class="form-control" id="loginPassword" maxlength="40" required placeholder="Enter password" />
+                                <button class="btn btn-outline-secondary" type="button" onclick="togglePassword()">
+                                    <i class="bi bi-eye" id="togglePasswordIcon"></i>
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Email -->
+                        <div class="col-md-6">
+                            <label for="loginEmailId" class="form-label fw-semibold">
+                                Email <span class="text-danger">*</span>
+                            </label>
+                            <input type="email" class="form-control" id="loginEmailId" maxlength="100" required placeholder="Enter email" />
+                        </div>
+
+                        <!-- Designation -->
+                        <div class="col-md-6">
+                            <label for="loginDesignation" class="form-label fw-semibold">
+                                Designation <span class="text-danger">*</span>
+                            </label>
+                            <input type="text" class="form-control" id="loginDesignation" maxlength="40" required placeholder="e.g., Manager, Analyst" />
+                        </div>
+
+                        <!-- Department -->
+                        <div class="col-md-6">
+                            <label for="loginDeptCode" class="form-label fw-semibold">
+                                Department <span class="text-danger">*</span>
+                            </label>
+                            <select class="form-control form-select" id="loginDeptCode" required>
+                                <option value="">-- Select Department --</option>
+                            </select>
+                        </div>
+
+                        <!-- Mobile No -->
+                        <div class="col-md-6">
+                            <label for="loginMobileNo" class="form-label fw-semibold">
+                                Mobile No <span class="text-danger">*</span>
+                            </label>
+                            <input type="text" class="form-control" id="loginMobileNo" maxlength="15" required placeholder="Enter mobile number" />
+                        </div>
+
+                        <!-- Gender -->
+                        <div class="col-md-6">
+                            <label for="loginGender" class="form-label fw-semibold">
+                                Gender <span class="text-danger">*</span>
+                            </label>
+                            <select class="form-control form-select" id="loginGender" required>
+                                <option value="">-- Select Gender --</option>
+                                <option value="M">Male</option>
+                                <option value="F">Female</option>
+                            </select>
+                        </div>
+
+                        <!-- Date of Birth -->
+                        <div class="col-md-6">
+                            <label for="loginDob" class="form-label fw-semibold">Date of Birth</label>
+                            <input type="date" class="form-control" id="loginDob" />
+                        </div>
+
+                        <!-- Is Approver -->
+                        <div class="col-md-3">
+                            <label class="form-label fw-semibold">Is Approver</label>
+                            <div class="form-check mt-2">
+                                <input class="form-check-input" type="checkbox" id="loginIsApprover" onchange="toggleApprovalLevel()" />
+                                <label class="form-check-label" for="loginIsApprover">Yes</label>
+                            </div>
+                        </div>
+
+                        <!-- Approval Level -->
+                        <div class="col-md-3" id="approvalLevelGroup" style="display:none;">
+                            <label for="loginApprovalLevel" class="form-label fw-semibold">Approval Level</label>
+                            <input type="number" class="form-control" id="loginApprovalLevel" min="0" max="10" value="0" disabled />
+                        </div>
+
+                        <!-- Active -->
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Active Status</label>
+                            <div class="form-check mt-2">
+                                <input class="form-check-input" type="checkbox" id="loginActiveFlag" checked />
+                                <label class="form-check-label" for="loginActiveFlag">Active</label>
+                            </div>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                    <i class="bi bi-x-lg me-1"></i>Cancel
+                </button>
+                <button type="button" class="btn btn-primary" id="btnSaveUser" onclick="saveUser()">
+                    <i class="bi bi-save me-1"></i>Save User
+                </button>
+            </div>
+        </div>
+    </div>
 </div>
+
+<!-- Delete Confirmation Modal -->
+<div class="modal fade" id="deleteModal" tabindex="-1" aria-labelledby="deleteModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title" id="deleteModalLabel">
+                    <i class="bi bi-exclamation-triangle me-2"></i>Confirm Deactivation
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="deleteUserId" />
+                <p>Are you sure you want to deactivate user <strong id="deleteUserName"></strong>?</p>
+                <p class="text-muted small">The user will be deactivated and will no longer be able to log in.</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-danger" id="btnConfirmDelete" onclick="confirmDelete()">
+                    <i class="bi bi-trash me-1"></i>Deactivate
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Toast Notifications -->
+<div class="toast-container position-fixed top-0 end-0 p-3" style="z-index: 9999">
+    <div id="successToast" class="toast align-items-center text-white bg-success border-0 shadow-lg" role="alert">
+        <div class="d-flex">
+            <div class="toast-body fw-semibold">
+                <i class="bi bi-check-circle-fill me-2"></i>
+                <span id="successToastMessage"></span>
+            </div>
+            <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+        </div>
+    </div>
+
+    <div id="errorToast" class="toast align-items-center text-white bg-danger border-0 shadow-lg" role="alert">
+        <div class="d-flex">
+            <div class="toast-body fw-semibold">
+                <i class="bi bi-x-circle-fill me-2"></i>
+                <span id="errorToastMessage"></span>
+            </div>
+            <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        var departments = [];
+
+        $(document).ready(function () {
+            loadDepartments();
+            loadUsers();
+        });
+
+        // ===================== TOAST =====================
+        function showToast(type, message) {
+            var toastEl, toastMessage;
+            if (type === 'success') {
+                toastEl = document.getElementById('successToast');
+                toastMessage = document.getElementById('successToastMessage');
+            } else {
+                toastEl = document.getElementById('errorToast');
+                toastMessage = document.getElementById('errorToastMessage');
+            }
+            toastMessage.textContent = message;
+            var toast = new bootstrap.Toast(toastEl, {
+                delay: type === 'success' ? 3000 : 5000
+            });
+            toast.show();
+        }
+
+        // ===================== LOAD DEPARTMENTS =====================
+        function loadDepartments() {
+            $.ajax({
+                url: '@Url.Action("GetDepartments", "Home")',
+                type: 'GET',
+                success: function (response) {
+                    if (response.success) {
+                        departments = response.data;
+                        var select = $('#loginDeptCode');
+                        select.find('option:not(:first)').remove();
+                        $.each(departments, function (i, dept) {
+                            select.append('<option value="' + dept.DeptCode + '">' + dept.DeptName + '</option>');
+                        });
+                    }
+                }
+            });
+        }
+
+        // ===================== LOAD USERS =====================
+        function loadUsers() {
+            var tbody = $('#usersTableBody');
+            tbody.html('<tr><td colspan="10" class="text-center py-4"><div class="spinner-border text-primary" role="status"></div><p class="mt-2 mb-0">Loading users...</p></td></tr>');
+
+            $.ajax({
+                url: '@Url.Action("GetAllUsers", "Home")',
+                type: 'GET',
+                success: function (response) {
+                    if (response.success) {
+                        displayUsers(response.data);
+                    } else {
+                        tbody.html('<tr><td colspan="10" class="text-center py-4 text-danger"><i class="bi bi-exclamation-triangle fs-3"></i><p class="mt-2 mb-0">' + response.message + '</p></td></tr>');
+                    }
+                },
+                error: function () {
+                    tbody.html('<tr><td colspan="10" class="text-center py-4 text-danger">Error loading users</td></tr>');
+                }
+            });
+        }
+
+        function displayUsers(users) {
+            var tbody = $('#usersTableBody');
+            tbody.empty();
+
+            if (!users || users.length === 0) {
+                tbody.html('<tr><td colspan="10" class="text-center py-4 text-muted"><i class="bi bi-inbox fs-1"></i><p class="mt-2 mb-0">No users found</p></td></tr>');
+                return;
+            }
+
+            $.each(users, function (index, user) {
+                var statusBadge = user.LoginActiveFlag
+                    ? '<span class="badge bg-success user-badge">Active</span>'
+                    : '<span class="badge bg-secondary user-badge">Inactive</span>';
+
+                var approverBadge = user.LoginIsApprover
+                    ? '<span class="badge bg-info user-badge">L' + user.LoginApprovalLevel + '</span>'
+                    : '<span class="text-muted">-</span>';
+
+                var actions = '';
+                // Edit button
+                actions += '<button class="btn btn-sm btn-outline-primary action-btn me-1" onclick="openEditUserDialog(' + user.LoginId + ')" title="Edit">';
+                actions += '<i class="bi bi-pencil"></i></button>';
+
+                // Delete button (not for admin user id=1)
+                if (user.LoginId !== 1) {
+                    actions += '<button class="btn btn-sm btn-outline-danger action-btn" onclick="openDeleteDialog(' + user.LoginId + ', \'' + escapeHtml(user.LoginName) + '\')" title="Deactivate">';
+                    actions += '<i class="bi bi-trash"></i></button>';
+                }
+
+                var row = '<tr>' +
+                    '<td>' + user.LoginId + '</td>' +
+                    '<td><strong>' + escapeHtml(user.LoginUser) + '</strong></td>' +
+                    '<td>' + escapeHtml(user.LoginName) + '</td>' +
+                    '<td>' + escapeHtml(user.LoginEmailId || '') + '</td>' +
+                    '<td>' + escapeHtml(user.LoginDesignation || '') + '</td>' +
+                    '<td>' + escapeHtml(user.DepartmentName || '') + '</td>' +
+                    '<td>' + escapeHtml(user.LoginMobileNo || '') + '</td>' +
+                    '<td class="text-center">' + approverBadge + '</td>' +
+                    '<td class="text-center">' + statusBadge + '</td>' +
+                    '<td class="text-center">' + actions + '</td>' +
+                    '</tr>';
+
+                tbody.append(row);
+            });
+        }
+
+        // ===================== ADD USER =====================
+        function openAddUserDialog() {
+            resetForm();
+            $('#modalTitleText').text('Add User');
+            $('#loginId').val(0);
+            $('#loginActiveFlag').prop('checked', true);
+            $('#loginUser').prop('readonly', false);
+            $('#userModal').modal('show');
+        }
+
+        // ===================== EDIT USER =====================
+        function openEditUserDialog(id) {
+            resetForm();
+            $('#modalTitleText').text('Edit User');
+
+            $.ajax({
+                url: '@Url.Action("GetUserById", "Home")',
+                type: 'GET',
+                data: { id: id },
+                success: function (response) {
+                    if (response.success) {
+                        var user = response.data;
+                        $('#loginId').val(user.LoginId);
+                        $('#loginUser').val(user.LoginUser);
+                        $('#loginName').val(user.LoginName);
+                        $('#loginPassword').val(user.LoginPassword);
+                        $('#loginEmailId').val(user.LoginEmailId);
+                        $('#loginDesignation').val(user.LoginDesignation);
+                        $('#loginDeptCode').val(user.LoginDeptCode);
+                        $('#loginMobileNo').val(user.LoginMobileNo);
+                        $('#loginGender').val(user.LoginGender ? user.LoginGender.trim() : '');
+
+                        // Format date for input
+                        if (user.LoginDob) {
+                            var dob = parseDate(user.LoginDob);
+                            if (dob) {
+                                $('#loginDob').val(dob.toISOString().split('T')[0]);
+                            }
+                        }
+
+                        $('#loginIsApprover').prop('checked', user.LoginIsApprover);
+                        $('#loginApprovalLevel').val(user.LoginApprovalLevel || 0);
+                        toggleApprovalLevel();
+
+                        $('#loginActiveFlag').prop('checked', user.LoginActiveFlag);
+
+                        $('#userModal').modal('show');
+                    } else {
+                        showToast('error', response.message);
+                    }
+                },
+                error: function () {
+                    showToast('error', 'Error fetching user details');
+                }
+            });
+        }
+
+        // ===================== SAVE USER =====================
+        function saveUser() {
+            // Basic validation
+            var form = document.getElementById('userForm');
+            if (!form.checkValidity()) {
+                form.reportValidity();
+                return;
+            }
+
+            var data = {
+                LoginId: parseInt($('#loginId').val()) || 0,
+                LoginUser: $('#loginUser').val().trim(),
+                LoginName: $('#loginName').val().trim(),
+                LoginPassword: $('#loginPassword').val().trim(),
+                LoginDesignation: $('#loginDesignation').val().trim(),
+                LoginMobileNo: $('#loginMobileNo').val().trim(),
+                LoginEmailId: $('#loginEmailId').val().trim(),
+                LoginDob: $('#loginDob').val() || null,
+                LoginGender: $('#loginGender').val(),
+                LoginDeptCode: parseInt($('#loginDeptCode').val()) || 0,
+                LoginIsApprover: $('#loginIsApprover').is(':checked'),
+                LoginApprovalLevel: $('#loginIsApprover').is(':checked') ? (parseInt($('#loginApprovalLevel').val()) || 0) : 0,
+                LoginActiveFlag: $('#loginActiveFlag').is(':checked')
+            };
+
+            // Extra validation
+            if (!data.LoginUser) { showToast('error', 'Username is required'); return; }
+            if (!data.LoginName) { showToast('error', 'Full Name is required'); return; }
+            if (!data.LoginPassword) { showToast('error', 'Password is required'); return; }
+            if (!data.LoginEmailId) { showToast('error', 'Email is required'); return; }
+            if (!data.LoginDeptCode) { showToast('error', 'Department is required'); return; }
+
+            $('#btnSaveUser').prop('disabled', true).html('<i class="bi bi-hourglass-split me-1"></i>Saving...');
+
+            $.ajax({
+                url: '@Url.Action("SaveUser", "Home")',
+                type: 'POST',
+                data: data,
+                success: function (response) {
+                    $('#btnSaveUser').prop('disabled', false).html('<i class="bi bi-save me-1"></i>Save User');
+                    if (response.success) {
+                        showToast('success', response.message);
+                        $('#userModal').modal('hide');
+                        loadUsers();
+                    } else {
+                        showToast('error', response.message);
+                    }
+                },
+                error: function () {
+                    $('#btnSaveUser').prop('disabled', false).html('<i class="bi bi-save me-1"></i>Save User');
+                    showToast('error', 'Error saving user');
+                }
+            });
+        }
+
+        // ===================== DELETE USER =====================
+        function openDeleteDialog(id, name) {
+            $('#deleteUserId').val(id);
+            $('#deleteUserName').text(name);
+            $('#deleteModal').modal('show');
+        }
+
+        function confirmDelete() {
+            var id = parseInt($('#deleteUserId').val());
+
+            $('#btnConfirmDelete').prop('disabled', true).html('<i class="bi bi-hourglass-split me-1"></i>Processing...');
+
+            $.ajax({
+                url: '@Url.Action("DeleteUser", "Home")',
+                type: 'POST',
+                data: { id: id },
+                success: function (response) {
+                    $('#btnConfirmDelete').prop('disabled', false).html('<i class="bi bi-trash me-1"></i>Deactivate');
+                    $('#deleteModal').modal('hide');
+
+                    if (response.success) {
+                        showToast('success', response.message);
+                        loadUsers();
+                    } else {
+                        showToast('error', response.message);
+                    }
+                },
+                error: function () {
+                    $('#btnConfirmDelete').prop('disabled', false).html('<i class="bi bi-trash me-1"></i>Deactivate');
+                    showToast('error', 'Error deleting user');
+                }
+            });
+        }
+
+        // ===================== HELPERS =====================
+        function resetForm() {
+            $('#userForm')[0].reset();
+            $('#loginId').val(0);
+            $('#loginIsApprover').prop('checked', false);
+            $('#loginActiveFlag').prop('checked', true);
+            $('#loginApprovalLevel').val(0);
+            $('#approvalLevelGroup').hide();
+        }
+
+        function toggleApprovalLevel() {
+            if ($('#loginIsApprover').is(':checked')) {
+                $('#approvalLevelGroup').show();
+                $('#loginApprovalLevel').prop('disabled', false).attr('min', '1');
+                if (parseInt($('#loginApprovalLevel').val()) === 0) {
+                    $('#loginApprovalLevel').val(1);
+                }
+            } else {
+                $('#approvalLevelGroup').hide();
+                $('#loginApprovalLevel').val(0).prop('disabled', true).attr('min', '0');
+            }
+        }
+
+        function togglePassword() {
+            var input = document.getElementById('loginPassword');
+            var icon = document.getElementById('togglePasswordIcon');
+            if (input.type === 'password') {
+                input.type = 'text';
+                icon.classList.remove('bi-eye');
+                icon.classList.add('bi-eye-slash');
+            } else {
+                input.type = 'password';
+                icon.classList.remove('bi-eye-slash');
+                icon.classList.add('bi-eye');
+            }
+        }
+
+        function escapeHtml(text) {
+            if (!text) return '';
+            var div = document.createElement('div');
+            div.appendChild(document.createTextNode(text));
+            return div.innerHTML;
+        }
+
+        function parseDate(dateString) {
+            if (!dateString) return null;
+            // Handle ASP.NET /Date(ticks)/ format
+            if (typeof dateString === 'string' && dateString.indexOf('/Date(') > -1) {
+                var ticks = parseInt(dateString.replace(/\/Date\((-?\d+)\)\//, '$1'));
+                return new Date(ticks);
+            }
+            var d = new Date(dateString);
+            return isNaN(d.getTime()) ? null : d;
+        }
+    </script>
+}

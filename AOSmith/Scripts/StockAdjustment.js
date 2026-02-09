@@ -14,23 +14,24 @@
     let itemsLoaded = false;
     let locationsLoaded = false;
 
+    // Default location from App Options (for Stock Decrease)
+    let defaultAppLocation = '';
+
     // Initialize on document ready
-    $(document).ready(function ()
-    {
+    $(document).ready(function () {
         initializeEvents();
         loadMasterDataFromApi();
+        loadDefaultAppLocation();
     });
 
     // ==================== SPINNER HELPERS ====================
 
-    function showSpinner(message)
-    {
+    function showSpinner(message) {
         $('#spinnerMessage').text(message || 'Loading...');
         $('#globalSpinner').css('display', 'flex');
     }
 
-    function hideSpinner()
-    {
+    function hideSpinner() {
         $('#globalSpinner').hide();
     }
 
@@ -43,8 +44,7 @@
         var itemsPromise = loadItemsFromApi();
         var locationsPromise = loadLocationsFromApi();
 
-        $.when(itemsPromise, locationsPromise).always(function ()
-        {
+        $.when(itemsPromise, locationsPromise).always(function () {
             hideSpinner();
         });
     }
@@ -57,18 +57,15 @@
             data: { term: '' },
             success: function (response)
             {
-                if (response.success && response.results)
-                {
+                if (response.success && response.results) {
                     cachedItems = response.results;
                     itemsLoaded = true;
                     populateItemDropdown(cachedItems);
-                } else
-                {
+                } else {
                     showAlert(response.message || 'Failed to load items from Sage API', 'error');
                 }
             },
-            error: function ()
-            {
+            error: function () {
                 showAlert('Error connecting to Sage API for items', 'error');
             }
         });
@@ -82,19 +79,31 @@
             data: { term: '' },
             success: function (response)
             {
-                if (response.success && response.results)
-                {
+                if (response.success && response.results) {
                     cachedLocations = response.results;
                     locationsLoaded = true;
-                    populateLocationDropdowns(cachedLocations);
-                } else
-                {
+                    populateLocationDropdown(cachedLocations);
+                } else {
                     showAlert(response.message || 'Failed to load locations from Sage API', 'error');
                 }
             },
-            error: function ()
-            {
+            error: function () {
                 showAlert('Error connecting to Sage API for locations', 'error');
+            }
+        });
+    }
+
+    // Load default location from App Options (used for Stock Decrease To Location)
+    function loadDefaultAppLocation()
+    {
+        $.ajax({
+            url: '/StockAdjustment/GetDefaultLocation',
+            type: 'POST',
+            success: function (response)
+            {
+                if (response.success) {
+                    defaultAppLocation = response.location;
+                }
             }
         });
     }
@@ -105,28 +114,19 @@
         $select.empty();
         $select.append('<option value="">-- Select Item --</option>');
 
-        $.each(items, function (i, item)
-        {
+        $.each(items, function (i, item) {
             $select.append('<option value="' + escapeHtml(item.id) + '">' + escapeHtml(item.text) + '</option>');
         });
     }
 
-    function populateLocationDropdowns(locations)
+    function populateLocationDropdown(locations)
     {
-        var $fromSelect = $('#modalFromLocation');
-        var $toSelect = $('#modalToLocation');
+        var $select = $('#modalLocation');
+        $select.empty();
+        $select.append('<option value="">-- Select Location --</option>');
 
-        $fromSelect.empty();
-        $toSelect.empty();
-
-        $fromSelect.append('<option value="">-- Select Location --</option>');
-        $toSelect.append('<option value="">-- Select Location --</option>');
-
-        $.each(locations, function (i, loc)
-        {
-            var optionHtml = '<option value="' + escapeHtml(loc.id) + '">' + escapeHtml(loc.text) + '</option>';
-            $fromSelect.append(optionHtml);
-            $toSelect.append(optionHtml);
+        $.each(locations, function (i, loc) {
+            $select.append('<option value="' + escapeHtml(loc.id) + '">' + escapeHtml(loc.text) + '</option>');
         });
     }
 
@@ -146,6 +146,53 @@
         return found ? found.text : locationCode;
     }
 
+    // ==================== SELECT2 INITIALIZATION ====================
+
+    function initSelect2OnModal()
+    {
+        // Destroy existing Select2 instances if any
+        if ($('#modalRecType').hasClass('select2-hidden-accessible')) {
+            $('#modalRecType').select2('destroy');
+        }
+        if ($('#modalItemCode').hasClass('select2-hidden-accessible')) {
+            $('#modalItemCode').select2('destroy');
+        }
+        if ($('#modalLocation').hasClass('select2-hidden-accessible')) {
+            $('#modalLocation').select2('destroy');
+        }
+
+        var $modal = $('#itemModal');
+
+        $('#modalRecType').select2({
+            theme: 'bootstrap-5',
+            placeholder: '-- Select Type --',
+            allowClear: true,
+            dropdownParent: $modal,
+            width: '100%'
+        });
+
+        $('#modalItemCode').select2({
+            theme: 'bootstrap-5',
+            placeholder: '-- Select Item --',
+            allowClear: true,
+            dropdownParent: $modal,
+            width: '100%'
+        });
+
+        $('#modalLocation').select2({
+            theme: 'bootstrap-5',
+            placeholder: '-- Select Location --',
+            allowClear: true,
+            dropdownParent: $modal,
+            width: '100%'
+        });
+
+        // Bind Select2 change events for item code
+        $('#modalItemCode').off('select2:select select2:clear').on('select2:select select2:clear', function () {
+            loadItemDescription($(this).val());
+        });
+    }
+
     function initializeEvents()
     {
         // Add Item button
@@ -158,19 +205,9 @@
             saveItem();
         });
 
-        // Item Code selection - auto-fill description
-        $('#modalItemCode').on('change', function () {
+        // Item Code selection - auto-fill description (delegated for dynamically populated dropdown)
+        $(document).on('change', '#modalItemCode', function () {
             loadItemDescription($(this).val());
-        });
-
-        // REC Type change - validate locations
-        $('#modalRecType').on('change', function () {
-            handleRecTypeChange();
-        });
-
-        // Location changes - validate based on REC Type
-        $('#modalFromLocation, #modalToLocation').on('change', function () {
-            validateLocations();
         });
 
         // File upload change events
@@ -187,42 +224,46 @@
         $('#btnReviewData').on('click', function () {
             reviewData();
         });
+
+        // Import Excel button
+        $('#btnImportExcel').on('click', function () {
+            $('#importFileInput').click();
+        });
+
+        // Import file selected
+        $('#importFileInput').on('change', function ()
+        {
+            var file = this.files[ 0 ];
+            if (file) {
+                importExcelFile(file);
+                $(this).val('');
+            }
+        });
     }
 
     // Handle file upload
     function handleFileUpload($input)
     {
-        const fileTypeId = $input.data('file-type');
-        const maxSize = $input.data('max-size'); // in KB
-        const file = $input[ 0 ].files[ 0 ];
+        var fileTypeId = $input.data('file-type');
+        var maxSize = $input.data('max-size'); // in KB
+        var file = $input[ 0 ].files[ 0 ];
 
-        if (!file)
-        {
-            return;
-        }
+        if (!file) return;
 
-        // Validate file size
-        const fileSizeKB = file.size / 1024;
-        if (fileSizeKB > maxSize)
-        {
-            showAlert(`File size exceeds maximum limit of ${maxSize / 1024} MB`, 'warning');
+        var fileSizeKB = file.size / 1024;
+        if (fileSizeKB > maxSize) {
+            showAlert('File size exceeds maximum limit of ' + (maxSize / 1024) + ' MB', 'warning');
             $input.val('');
             return;
         }
 
-        // Store file
         uploadedFiles[ fileTypeId ] = file;
-
-        // Show file name
         $('#fileName_' + fileTypeId).text(file.name + ' (' + (fileSizeKB / 1024).toFixed(2) + ' MB)');
-
-        // Show clear button
         $('.btn-clear-file[data-file-id="' + fileTypeId + '"]').show();
     }
 
     // Clear file
-    function clearFile(fileTypeId)
-    {
+    function clearFile(fileTypeId) {
         delete uploadedFiles[ fileTypeId ];
         $('#file_' + fileTypeId).val('');
         $('#fileName_' + fileTypeId).text('');
@@ -232,20 +273,18 @@
     // Review Data
     function reviewData()
     {
-        // Validate grid data
         if (gridData.length === 0) {
             showAlert('Please add at least one item', 'warning');
             return;
         }
 
-        // Validate required files
-        let missingFiles = [];
+        var missingFiles = [];
         $('.file-upload').each(function ()
         {
-            const $input = $(this);
-            const isRequired = $input.data('required') === true || $input.data('required') === 'true';
-            const fileTypeId = $input.data('file-type');
-            const label = $input.closest('.mb-3').find('label').text().trim();
+            var $input = $(this);
+            var isRequired = $input.data('required') === true || $input.data('required') === 'true';
+            var fileTypeId = $input.data('file-type');
+            var label = $input.closest('.mb-3').find('label').text().trim();
 
             if (isRequired && !uploadedFiles[ fileTypeId ]) {
                 missingFiles.push(label.split('*')[ 0 ].trim());
@@ -257,109 +296,68 @@
             return;
         }
 
-        // Show review modal or navigate to review page
         showReviewModal();
     }
 
     // Show Review Modal
     function showReviewModal()
     {
-        // Build review data HTML
-        let itemsHtml = '';
-        gridData.forEach(function (item, index)
-        {
-            itemsHtml += `
-                <tr>
-                    <td>${index + 1}</td>
-                    <td>${item.itemCode}</td>
-                    <td>${item.itemDescription}</td>
-                    <td>${item.fromLocationName}</td>
-                    <td>${item.toLocationName}</td>
-                    <td>${item.recTypeName}</td>
-                    <td>${item.qty.toFixed(3)}</td>
-                </tr>
-            `;
+        var itemsHtml = '';
+        gridData.forEach(function (item, index) {
+            itemsHtml += '<tr>' +
+                '<td>' + (index + 1) + '</td>' +
+                '<td>' + escapeHtml(item.recTypeName) + '</td>' +
+                '<td>' + escapeHtml(item.itemCode) + '</td>' +
+                '<td>' + escapeHtml(item.itemDescription) + '</td>' +
+                '<td>' + escapeHtml(item.locationName) + '</td>' +
+                '<td>' + item.qty.toFixed(3) + '</td>' +
+                '<td>' + (item.cost ? parseFloat(item.cost).toFixed(4) : '0.0000') + '</td>' +
+                '</tr>';
         });
 
-        let filesHtml = '';
-        for (let fileTypeId in uploadedFiles)
-        {
-            const file = uploadedFiles[ fileTypeId ];
-            filesHtml += `<li>${file.name} (${(file.size / 1024 / 1024).toFixed(2)} MB)</li>`;
+        var filesHtml = '';
+        for (var fileTypeId in uploadedFiles) {
+            var file = uploadedFiles[ fileTypeId ];
+            filesHtml += '<li>' + escapeHtml(file.name) + ' (' + (file.size / 1024 / 1024).toFixed(2) + ' MB)</li>';
         }
 
-        const reviewHtml = `
-            <div class="modal fade" id="reviewModal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false">
-                <div class="modal-dialog modal-xl">
-                    <div class="modal-content">
-                        <div class="modal-header bg-primary text-white">
-                            <h5 class="modal-title"><i class="bi bi-eye-fill me-2"></i>Review Stock Adjustment</h5>
-                        </div>
-                        <div class="modal-body p-4">
-                            <h6 class="fw-bold mb-3">Transaction Details</h6>
-                            <div class="row mb-4">
-                                <div class="col-md-6">
-                                    <p><strong>Request Date:</strong> ${$('#requestDate').val()}</p>
-                                </div>
-                                <div class="col-md-6">
-                                    <p><strong>Requestor:</strong> ${$('#requestor').val()}</p>
-                                </div>
-                            </div>
+        var reviewHtml = '<div class="modal fade" id="reviewModal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false">' +
+            '<div class="modal-dialog modal-xl"><div class="modal-content">' +
+            '<div class="modal-header bg-primary text-white">' +
+            '<h5 class="modal-title"><i class="bi bi-eye-fill me-2"></i>Review Stock Adjustment</h5></div>' +
+            '<div class="modal-body p-4">' +
+            '<h6 class="fw-bold mb-3">Transaction Details</h6>' +
+            '<div class="row mb-4">' +
+            '<div class="col-md-6"><p><strong>Request Date:</strong> ' + $('#requestDate').val() + '</p></div>' +
+            '<div class="col-md-6"><p><strong>Requestor:</strong> ' + $('#requestor').val() + '</p></div></div>' +
+            '<h6 class="fw-bold mb-3">Items (' + gridData.length + ')</h6>' +
+            '<div class="table-responsive mb-4"><table class="table table-bordered table-sm">' +
+            '<thead class="table-light"><tr>' +
+            '<th>Sr No</th><th>Adj Type</th><th>Item Code</th><th>Description</th><th>Location</th><th>Qty</th><th>Cost</th>' +
+            '</tr></thead><tbody>' + itemsHtml + '</tbody></table></div>' +
+            '<h6 class="fw-bold mb-3">Attachments (' + Object.keys(uploadedFiles).length + ')</h6>' +
+            '<ul class="list-unstyled">' + filesHtml + '</ul>' +
+            '</div><div class="modal-footer">' +
+            '<button type="button" class="btn btn-secondary" data-bs-dismiss="modal"><i class="bi bi-arrow-left me-2"></i>Back to Edit</button>' +
+            '<button type="button" class="btn btn-success" id="btnConfirmSubmit"><i class="bi bi-check-circle me-2"></i>Confirm & Submit</button>' +
+            '</div></div></div></div>';
 
-                            <h6 class="fw-bold mb-3">Items (${gridData.length})</h6>
-                            <div class="table-responsive mb-4">
-                                <table class="table table-bordered table-sm">
-                                    <thead class="table-light">
-                                        <tr>
-                                            <th>Sr No</th>
-                                            <th>Item Code</th>
-                                            <th>Description</th>
-                                            <th>From Location</th>
-                                            <th>To Location</th>
-                                            <th>Type</th>
-                                            <th>Qty</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>${itemsHtml}</tbody>
-                                </table>
-                            </div>
-
-                            <h6 class="fw-bold mb-3">Attachments (${Object.keys(uploadedFiles).length})</h6>
-                            <ul class="list-unstyled">${filesHtml}</ul>
-                        </div>
-                        <div class="modal-footer">
-                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
-                                <i class="bi bi-arrow-left me-2"></i>Back to Edit
-                            </button>
-                            <button type="button" class="btn btn-success" id="btnConfirmSubmit">
-                                <i class="bi bi-check-circle me-2"></i>Confirm & Submit
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        `;
-
-        // Remove existing review modal if any
         $('#reviewModal').remove();
-
-        // Add review modal to body
         $('body').append(reviewHtml);
 
-        // Show modal
         var reviewModal = new bootstrap.Modal(document.getElementById('reviewModal'));
         reviewModal.show();
 
-        // Handle confirm submit
-        $('#btnConfirmSubmit').on('click', function ()
-        {
+        $('#btnConfirmSubmit').on('click', function () {
             submitStockAdjustment();
         });
     }
 
     // Open modal for add/edit
-    function openItemModal(index = -1)
+    function openItemModal(index)
     {
+        if (typeof index === 'undefined') index = -1;
+
         if (index >= 0) {
             $('#itemModalLabel').html('<i class="bi bi-pencil-square me-2"></i>Edit Item');
         } else {
@@ -369,30 +367,35 @@
         $('#itemForm')[ 0 ].reset();
         $('#editIndex').val(index);
         $('#modalItemDesc').val('');
-        $('#locationMatchWarning').hide();
+        $('#modalCost').val('');
 
-        // Reset To Location to enabled state
-        $('#modalToLocation').prop('disabled', false).css('background-color', '');
-
-        if (index >= 0) {
-            // Edit mode - populate form
-            const item = gridData[ index ];
-            $('#stockRecSno').val(item.stockRecSno);
-            $('#modalRecType').val(item.recType);
-            $('#modalItemCode').val(item.itemCode);
-            $('#modalFromLocation').val(item.fromLocation);
-            $('#modalToLocation').val(item.toLocation);
-            $('#modalQty').val(item.qty);
-            $('#modalItemDesc').val(item.itemDescription);
-            handleRecTypeChange();
-        } else {
-            // Add mode - assign next SNO
-            $('#stockRecSno').val(nextStockRecSno);
-        }
-
-        // Bootstrap 5 way to show modal
+        // Show modal first so Select2 can measure properly
         var myModal = new bootstrap.Modal(document.getElementById('itemModal'));
         myModal.show();
+
+        // Initialize Select2 after modal is fully shown
+        $('#itemModal').off('shown.bs.modal.s2init').on('shown.bs.modal.s2init', function ()
+        {
+            initSelect2OnModal();
+
+            if (index >= 0) {
+                // Edit mode - populate form
+                var item = gridData[ index ];
+                $('#stockRecSno').val(item.stockRecSno);
+                $('#modalRecType').val(item.recType).trigger('change');
+                $('#modalItemCode').val(item.itemCode).trigger('change');
+                $('#modalLocation').val(item.location).trigger('change');
+                $('#modalQty').val(item.qty);
+                $('#modalItemDesc').val(item.itemDescription);
+                $('#modalCost').val(item.cost ? parseFloat(item.cost).toFixed(4) : '');
+            } else {
+                // Add mode
+                $('#stockRecSno').val(nextStockRecSno);
+                $('#modalRecType').val('').trigger('change');
+                $('#modalItemCode').val('').trigger('change');
+                $('#modalLocation').val('').trigger('change');
+            }
+        });
     }
 
     // Load item description from cached items
@@ -400,21 +403,17 @@
     {
         if (!itemCode) {
             $('#modalItemDesc').val('');
+            $('#modalCost').val('');
             return;
         }
 
-        // Find from cached items
         var found = cachedItems.find(function (i) { return i.id === itemCode; });
-        if (found)
-        {
-            // Extract just the description part (after "code - ")
+        if (found) {
             var parts = found.text.split(' - ');
             var desc = parts.length > 1 ? parts.slice(1).join(' - ') : found.text;
             $('#modalItemDesc').val(desc);
         } else
         {
-            // Fallback: call API
-            showSpinner('Loading item details...');
             $.ajax({
                 url: '/StockAdjustment/GetItemDetails',
                 type: 'POST',
@@ -424,101 +423,35 @@
                     if (response.success) {
                         $('#modalItemDesc').val(response.description);
                     }
-                },
-                error: function () {
-                    showAlert('Error loading item details', 'error');
-                },
-                complete: function () {
-                    hideSpinner();
                 }
             });
         }
+
+        // Always fetch cost from Sage ItemSearch API
+        loadItemCost(itemCode);
     }
 
-    // Handle REC Type change
-    function handleRecTypeChange()
+    // Fetch cost (stdcost) from Sage ItemSearch API endpoint
+    function loadItemCost(itemCode)
     {
-        const recType = parseInt($('#modalRecType').val());
-
-        if (recType === 12)
-        {
-            // REC Type 12 (STOCK INCREASE): From and To must match
-            $('#locationMatchWarning').show();
-
-            // Clear and enable To Location
-            $('#modalToLocation').val('');
-            $('#modalToLocation').prop('disabled', false).css('background-color', '');
-
-            // Auto-sync To location when From changes
-            $('#modalFromLocation').off('change.sync').on('change.sync', function () {
-                $('#modalToLocation').val($(this).val());
-            });
-
-            // Auto-sync From location when To changes
-            $('#modalToLocation').off('change.sync').on('change.sync', function () {
-                $('#modalFromLocation').val($(this).val());
-            });
-        } else if (recType === 10) {
-            // REC Type 10 (STOCK DECREASE): To Location is read-only from APP_Options
-            $('#locationMatchWarning').hide();
-            $('#modalFromLocation').off('change.sync');
-            $('#modalToLocation').off('change.sync');
-
-            // Load default location from APP_Options and set To Location as readonly
-            loadDefaultLocationForStockDecrease();
-        } else {
-            // Other types or no selection
-            $('#locationMatchWarning').hide();
-            $('#modalFromLocation').off('change.sync');
-            $('#modalToLocation').off('change.sync');
-
-            // Clear and enable To Location
-            $('#modalToLocation').val('');
-            $('#modalToLocation').prop('disabled', false).css('background-color', '');
-        }
-    }
-
-    // Load default location for Stock Decrease (REC Type 10)
-    function loadDefaultLocationForStockDecrease()
-    {
-        showSpinner('Loading default location...');
+        $('#modalCost').val('Loading...');
         $.ajax({
-            url: '/StockAdjustment/GetDefaultLocation',
+            url: '/StockAdjustment/GetItemCost',
             type: 'POST',
+            data: { itemCode: itemCode },
             success: function (response)
             {
                 if (response.success) {
-                    $('#modalToLocation').val(response.location);
-                    $('#modalToLocation').prop('disabled', true).css('background-color', '#e9ecef');
+                    $('#modalCost').val(response.cost != null ? parseFloat(response.cost).toFixed(4) : '0.0000');
                 } else {
-                    showAlert(response.message || 'Default location not configured', 'error');
-                    $('#modalToLocation').val('');
-                    $('#modalToLocation').prop('disabled', true).css('background-color', '#e9ecef');
+                    $('#modalCost').val('');
                 }
             },
             error: function () {
-                showAlert('Error loading default location', 'error');
-                $('#modalToLocation').prop('disabled', true).css('background-color', '#e9ecef');
-            },
-            complete: function () {
-                hideSpinner();
+                $('#modalCost').val('');
+                showAlert('Error fetching item cost from Sage', 'error');
             }
         });
-    }
-
-    // Validate locations based on REC Type
-    function validateLocations()
-    {
-        const recType = parseInt($('#modalRecType').val());
-        const fromLoc = $('#modalFromLocation').val();
-        const toLoc = $('#modalToLocation').val();
-
-        if (recType === 12 && fromLoc && toLoc && fromLoc !== toLoc) {
-            showAlert('For Stock Increase, From and To locations must be the same', 'warning');
-            return false;
-        }
-
-        return true;
     }
 
     // Save item to grid
@@ -530,48 +463,76 @@
             return;
         }
 
-        // Validate locations
-        if (!validateLocations()) {
+        var editIndex = parseInt($('#editIndex').val());
+        var stockRecSno = parseInt($('#stockRecSno').val());
+        var recType = parseInt($('#modalRecType').val());
+        var recTypeName = $('#modalRecType option:selected').text();
+        var itemCode = $('#modalItemCode').val();
+        var itemDescription = $('#modalItemDesc').val();
+        var location = $('#modalLocation').val();
+        var locationName = getLocationDisplayText(location);
+        var qty = parseFloat($('#modalQty').val());
+        var cost = $('#modalCost').val();
+
+        if (!recType) {
+            showAlert('Please select an Adjustment Type', 'warning');
+            return;
+        }
+        if (!itemCode) {
+            showAlert('Please select an Item', 'warning');
+            return;
+        }
+        if (!location) {
+            showAlert('Please select a Location', 'warning');
             return;
         }
 
-        const editIndex = parseInt($('#editIndex').val());
-        const stockRecSno = parseInt($('#stockRecSno').val());
-        const recType = parseInt($('#modalRecType').val());
-        const recTypeName = $('#modalRecType option:selected').text();
-        const itemCode = $('#modalItemCode').val();
-        const itemDescription = $('#modalItemDesc').val();
-        const fromLocation = $('#modalFromLocation').val();
-        const fromLocationName = $('#modalFromLocation option:selected').text();
-        const toLocation = $('#modalToLocation').val();
-        const toLocationName = $('#modalToLocation option:selected').text();
-        const qty = parseFloat($('#modalQty').val());
+        // Derive From/To Location based on Adjustment Type
+        var fromLocation, toLocation, fromLocationName, toLocationName;
+        if (recType === 12) {
+            // Stock Increase: both From and To = selected Location
+            fromLocation = location;
+            toLocation = location;
+            fromLocationName = locationName;
+            toLocationName = locationName;
+        } else if (recType === 10) {
+            // Stock Decrease: From = selected Location, To = default from App Options
+            fromLocation = location;
+            toLocation = defaultAppLocation;
+            fromLocationName = locationName;
+            toLocationName = getLocationDisplayText(defaultAppLocation) || defaultAppLocation;
+        } else {
+            fromLocation = location;
+            toLocation = location;
+            fromLocationName = locationName;
+            toLocationName = locationName;
+        }
 
-        const item = {
+        var item = {
             stockRecSno: stockRecSno,
             recType: recType,
             recTypeName: recTypeName,
             itemCode: itemCode,
             itemDescription: itemDescription,
+            location: location,
+            locationName: locationName,
             fromLocation: fromLocation,
             fromLocationName: fromLocationName,
             toLocation: toLocation,
             toLocationName: toLocationName,
-            qty: qty
+            qty: qty,
+            cost: cost
         };
 
         if (editIndex >= 0) {
-            // Update existing item
             gridData[ editIndex ] = item;
         } else {
-            // Add new item
             gridData.push(item);
             nextStockRecSno++;
         }
 
         refreshGrid();
 
-        // Bootstrap 5 way to hide modal
         var modalElement = document.getElementById('itemModal');
         var modal = bootstrap.Modal.getInstance(modalElement);
         modal.hide();
@@ -582,44 +543,37 @@
     // Refresh grid display
     function refreshGrid()
     {
-        const tbody = $('#itemsTableBody');
+        var tbody = $('#itemsTableBody');
         tbody.empty();
 
-        if (gridData.length === 0)
-        {
+        if (gridData.length === 0) {
             tbody.append('<tr id="noDataRow"><td colspan="8" class="text-center text-muted">No items added yet. Click "Add Item" to begin.</td></tr>');
             return;
         }
 
-        gridData.forEach(function (item, index)
-        {
-            const displaySno = index + 1; // Always 1, 2, 3, 4...
-            const row = `
-                <tr>
-                    <td>${displaySno}</td>
-                    <td>${item.itemCode}</td>
-                    <td>${item.itemDescription}</td>
-                    <td>${item.fromLocationName}</td>
-                    <td>${item.toLocationName}</td>
-                    <td>${item.recTypeName}</td>
-                    <td>${item.qty.toFixed(3)}</td>
-                    <td>
-                        <button type="button" class="btn btn-sm btn-warning" onclick="editItem(${index})">
-                            <i class="fas fa-edit"></i> Edit
-                        </button>
-                        <button type="button" class="btn btn-sm btn-danger" onclick="deleteItem(${index})">
-                            <i class="fas fa-trash"></i> Delete
-                        </button>
-                    </td>
-                </tr>
-            `;
+        gridData.forEach(function (item, index) {
+            var displaySno = index + 1;
+            var costDisplay = item.cost ? parseFloat(item.cost).toFixed(4) : '0.0000';
+            var row = '<tr>' +
+                '<td>' + displaySno + '</td>' +
+                '<td>' + escapeHtml(item.recTypeName) + '</td>' +
+                '<td>' + escapeHtml(item.itemCode) + '</td>' +
+                '<td>' + escapeHtml(item.itemDescription) + '</td>' +
+                '<td>' + escapeHtml(item.locationName) + '</td>' +
+                '<td>' + item.qty.toFixed(3) + '</td>' +
+                '<td>' + costDisplay + '</td>' +
+                '<td>' +
+                '<button type="button" class="btn btn-sm btn-warning me-1" onclick="editItem(' + index + ')">' +
+                '<i class="bi bi-pencil-square"></i> Edit</button>' +
+                '<button type="button" class="btn btn-sm btn-danger" onclick="deleteItem(' + index + ')">' +
+                '<i class="bi bi-trash"></i> Delete</button>' +
+                '</td></tr>';
             tbody.append(row);
         });
     }
 
     // Edit item
-    window.editItem = function (index)
-    {
+    window.editItem = function (index) {
         openItemModal(index);
     };
 
@@ -636,13 +590,10 @@
     // Submit stock adjustment (called from review modal)
     function submitStockAdjustment()
     {
-        // Prepare FormData for file upload
-        const formData = new FormData();
+        var formData = new FormData();
 
-        // Add transaction data
         formData.append('transactionDate', $('#requestDate').val());
 
-        // Add line items as JSON
         formData.append('lineItemsJson', JSON.stringify(gridData.map(function (item)
         {
             return {
@@ -656,12 +607,10 @@
             };
         })));
 
-        // Add files
-        for (let fileTypeId in uploadedFiles) {
+        for (var fileTypeId in uploadedFiles) {
             formData.append('file_' + fileTypeId, uploadedFiles[ fileTypeId ]);
         }
 
-        // Show global spinner
         showSpinner('Submitting stock adjustment...');
 
         $.ajax({
@@ -679,30 +628,23 @@
 
                 if (response.success)
                 {
-                    // Close review modal
                     var reviewModalEl = document.getElementById('reviewModal');
                     var reviewModal = bootstrap.Modal.getInstance(reviewModalEl);
                     reviewModal.hide();
 
-                    // Show Sage API response modal if we have sage results
                     if (response.sageResults && response.sageResults.length > 0) {
                         showSageResponseModal(response.message, response.sageResults);
                     } else
                     {
                         showAlert('Stock adjustment saved successfully!', 'success');
-                        setTimeout(function () {
-                            window.location.reload();
-                        }, 2000);
+                        setTimeout(function () { window.location.reload(); }, 2000);
                     }
                 } else
                 {
                     showAlert(response.message || 'Failed to save stock adjustment', 'error');
-
-                    // Still show Sage results if any were returned
                     if (response.sageResults && response.sageResults.length > 0) {
                         showSageResponseModal(response.message, response.sageResults);
                     }
-
                     $('#btnConfirmSubmit').prop('disabled', false).html('<i class="bi bi-check-circle me-2"></i>Confirm & Submit');
                 }
             },
@@ -717,7 +659,7 @@
     // Show toast notification
     function showAlert(message, type)
     {
-        let toastEl, toastMessage, toastInstance;
+        var toastEl, toastMessage;
 
         if (type === 'success') {
             toastEl = document.getElementById('successToast');
@@ -730,11 +672,9 @@
             toastMessage = document.getElementById('errorToastMessage');
         }
 
-        // Set message
         toastMessage.textContent = message;
 
-        // Show toast
-        toastInstance = new bootstrap.Toast(toastEl, {
+        var toastInstance = new bootstrap.Toast(toastEl, {
             delay: type === 'success' ? 3000 : type === 'warning' ? 4000 : 5000
         });
         toastInstance.show();
@@ -743,74 +683,34 @@
     // Show Sage API response in a modal
     function showSageResponseModal(dbMessage, sageResults)
     {
-        // Build sage results HTML
-        let sageHtml = '';
-        sageResults.forEach(function (sage, index)
-        {
+        var sageHtml = '';
+        sageResults.forEach(function (sage, index) {
             var statusClass = (sage.sageStatus || '').toLowerCase() === 'error' ? 'danger' : 'success';
             var statusIcon = statusClass === 'success' ? 'bi-check-circle-fill' : 'bi-x-circle-fill';
-            var docRef = sage.documentReference || `RecType ${sage.recType} | RecNumber ${sage.recNumber}`;
+            var docRef = sage.documentReference || ('RecType ' + sage.recType + ' | RecNumber ' + sage.recNumber);
 
-            sageHtml += `
-                <div class="card mb-3 border-${statusClass}">
-                    <div class="card-header bg-${statusClass} bg-opacity-10 d-flex justify-content-between align-items-center">
-                        <span>
-                            <i class="bi ${statusIcon} text-${statusClass} me-2"></i>
-                            <strong>${docRef}</strong>
-                        </span>
-                        <span class="badge bg-${statusClass}">${sage.sageStatus || 'Unknown'}</span>
-                    </div>
-                    <div class="card-body">
-                        <p class="mb-2"><strong>Message:</strong> ${sage.sageMessage || 'No message'}</p>
-                        <div class="mt-2">
-                            <button class="btn btn-sm btn-outline-primary me-2" type="button"
-                                data-bs-toggle="collapse" data-bs-target="#sageReq${index}">
-                                <i class="bi bi-arrow-up-circle me-1"></i>View Request Sent
-                            </button>
-                            <button class="btn btn-sm btn-outline-secondary" type="button"
-                                data-bs-toggle="collapse" data-bs-target="#sageRes${index}">
-                                <i class="bi bi-arrow-down-circle me-1"></i>View Response Received
-                            </button>
-                            <div class="collapse mt-2" id="sageReq${index}">
-                                <h6 class="text-muted mb-2">Request JSON Sent to Sage300:</h6>
-                                <pre class="bg-dark text-light p-3 rounded" style="max-height: 300px; overflow-y: auto; font-size: 0.85rem; white-space: pre-wrap; word-wrap: break-word;">${escapeHtml(formatJson(sage.sageRawRequest))}</pre>
-                            </div>
-                            <div class="collapse mt-2" id="sageRes${index}">
-                                <h6 class="text-muted mb-2">Response JSON from Sage300:</h6>
-                                <pre class="bg-dark text-light p-3 rounded" style="max-height: 300px; overflow-y: auto; font-size: 0.85rem; white-space: pre-wrap; word-wrap: break-word;">${escapeHtml(formatJson(sage.sageRawResponse))}</pre>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            `;
+            sageHtml += '<div class="card mb-3 border-' + statusClass + '">' +
+                '<div class="card-header bg-' + statusClass + ' bg-opacity-10 d-flex justify-content-between align-items-center">' +
+                '<span><i class="bi ' + statusIcon + ' text-' + statusClass + ' me-2"></i><strong>' + escapeHtml(docRef) + '</strong></span>' +
+                '<span class="badge bg-' + statusClass + '">' + escapeHtml(sage.sageStatus || 'Unknown') + '</span></div>' +
+                '<div class="card-body"><p class="mb-2"><strong>Message:</strong> ' + escapeHtml(sage.sageMessage || 'No message') + '</p>' +
+                '<div class="mt-2">' +
+                '<button class="btn btn-sm btn-outline-primary me-2" type="button" data-bs-toggle="collapse" data-bs-target="#sageReq' + index + '"><i class="bi bi-arrow-up-circle me-1"></i>View Request</button>' +
+                '<button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#sageRes' + index + '"><i class="bi bi-arrow-down-circle me-1"></i>View Response</button>' +
+                '<div class="collapse mt-2" id="sageReq' + index + '"><pre class="bg-dark text-light p-3 rounded" style="max-height:300px;overflow-y:auto;font-size:0.85rem;white-space:pre-wrap;">' + escapeHtml(formatJson(sage.sageRawRequest)) + '</pre></div>' +
+                '<div class="collapse mt-2" id="sageRes' + index + '"><pre class="bg-dark text-light p-3 rounded" style="max-height:300px;overflow-y:auto;font-size:0.85rem;white-space:pre-wrap;">' + escapeHtml(formatJson(sage.sageRawResponse)) + '</pre></div>' +
+                '</div></div></div>';
         });
 
-        var modalHtml = `
-            <div class="modal fade" id="sageResponseModal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false">
-                <div class="modal-dialog modal-lg">
-                    <div class="modal-content">
-                        <div class="modal-header bg-info text-white">
-                            <h5 class="modal-title"><i class="bi bi-cloud-arrow-up me-2"></i>Sage300 API Response</h5>
-                        </div>
-                        <div class="modal-body p-4">
-                            <div class="alert alert-success mb-4">
-                                <i class="bi bi-database-check me-2"></i>
-                                <strong>Database:</strong> ${dbMessage}
-                            </div>
-                            <h6 class="fw-bold mb-3">Sage300 Transfer Entry Results</h6>
-                            ${sageHtml}
-                        </div>
-                        <div class="modal-footer">
-                            <button type="button" class="btn btn-primary" id="btnCloseSageModal">
-                                <i class="bi bi-check-lg me-2"></i>OK
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        `;
+        var modalHtml = '<div class="modal fade" id="sageResponseModal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false">' +
+            '<div class="modal-dialog modal-lg"><div class="modal-content">' +
+            '<div class="modal-header bg-info text-white"><h5 class="modal-title"><i class="bi bi-cloud-arrow-up me-2"></i>Sage300 API Response</h5></div>' +
+            '<div class="modal-body p-4">' +
+            '<div class="alert alert-success mb-4"><i class="bi bi-database-check me-2"></i><strong>Database:</strong> ' + escapeHtml(dbMessage) + '</div>' +
+            '<h6 class="fw-bold mb-3">Sage300 Transfer Entry Results</h6>' + sageHtml +
+            '</div><div class="modal-footer"><button type="button" class="btn btn-primary" id="btnCloseSageModal"><i class="bi bi-check-lg me-2"></i>OK</button></div>' +
+            '</div></div></div>';
 
-        // Remove existing modal if any
         $('#sageResponseModal').remove();
         $('body').append(modalHtml);
 
@@ -820,9 +720,7 @@
         $('#btnCloseSageModal').on('click', function ()
         {
             sageModal.hide();
-            setTimeout(function () {
-                window.location.reload();
-            }, 500);
+            setTimeout(function () { window.location.reload(); }, 500);
         });
     }
 
@@ -831,11 +729,100 @@
     {
         if (!str) return '';
         try {
-            var obj = JSON.parse(str);
-            return JSON.stringify(obj, null, 2);
+            return JSON.stringify(JSON.parse(str), null, 2);
         } catch (e) {
             return str;
         }
+    }
+
+    // ==================== EXCEL IMPORT ====================
+
+    function importExcelFile(file)
+    {
+        var formData = new FormData();
+        formData.append('file', file);
+
+        showSpinner('Importing and validating Excel file...');
+
+        $.ajax({
+            url: '/StockAdjustment/ImportExcel',
+            type: 'POST',
+            data: formData,
+            processData: false,
+            contentType: false,
+            success: function (response)
+            {
+                hideSpinner();
+
+                if (response.success)
+                {
+                    var imported = response.data;
+                    var snoStart = nextStockRecSno;
+                    for (var i = 0; i < imported.length; i++)
+                    {
+                        var row = imported[ i ];
+                        gridData.push({
+                            stockRecSno: snoStart + i,
+                            recType: row.recType,
+                            recTypeName: row.recTypeName,
+                            itemCode: row.itemCode,
+                            itemDescription: row.itemDescription,
+                            location: row.location,
+                            locationName: row.locationName,
+                            fromLocation: row.fromLocation,
+                            fromLocationName: row.fromLocationName,
+                            toLocation: row.toLocation,
+                            toLocationName: row.toLocationName,
+                            qty: row.qty,
+                            cost: row.cost || '0'
+                        });
+                    }
+                    nextStockRecSno = snoStart + imported.length;
+                    refreshGrid();
+                    showAlert(response.message, 'success');
+                } else if (response.errors && response.errors.length > 0) {
+                    showImportErrorsModal(response.errors);
+                } else {
+                    showAlert(response.message || 'Import failed', 'error');
+                }
+            },
+            error: function () {
+                hideSpinner();
+                showAlert('Error uploading Excel file', 'error');
+            }
+        });
+    }
+
+    function showImportErrorsModal(errors)
+    {
+        var errorsHtml = '';
+        errors.forEach(function (err, index) {
+            errorsHtml += '<tr>' +
+                '<td class="text-center">' + (index + 1) + '</td>' +
+                '<td class="text-center"><span class="badge bg-secondary">' + escapeHtml(err.cell) + '</span></td>' +
+                '<td>' + escapeHtml(err.field) + '</td>' +
+                '<td class="text-danger">' + escapeHtml(err.message) + '</td>' +
+                '</tr>';
+        });
+
+        var modalHtml = '<div class="modal fade" id="importErrorsModal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false">' +
+            '<div class="modal-dialog modal-lg modal-dialog-scrollable"><div class="modal-content">' +
+            '<div class="modal-header bg-danger text-white">' +
+            '<h5 class="modal-title"><i class="bi bi-exclamation-triangle-fill me-2"></i>Import Errors (' + errors.length + ')</h5>' +
+            '<button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button></div>' +
+            '<div class="modal-body p-4">' +
+            '<div class="alert alert-warning mb-3"><i class="bi bi-info-circle-fill me-2"></i>The following errors were found. Please fix them and re-import.</div>' +
+            '<div class="table-responsive"><table class="table table-bordered table-sm table-hover">' +
+            '<thead class="table-light"><tr><th style="width:5%;">#</th><th style="width:10%;">Cell</th><th style="width:20%;">Field</th><th>Error</th></tr></thead>' +
+            '<tbody>' + errorsHtml + '</tbody></table></div></div>' +
+            '<div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal"><i class="bi bi-x-circle me-1"></i>Close</button></div>' +
+            '</div></div></div>';
+
+        $('#importErrorsModal').remove();
+        $('body').append(modalHtml);
+
+        var errModal = new bootstrap.Modal(document.getElementById('importErrorsModal'));
+        errModal.show();
     }
 
     // Escape HTML to prevent XSS

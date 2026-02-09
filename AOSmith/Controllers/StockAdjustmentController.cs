@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using System.Web.Mvc;
@@ -8,6 +9,9 @@ using AOSmith.Helpers;
 using AOSmith.Models;
 using AOSmith.Services;
 using Newtonsoft.Json;
+using OfficeOpenXml;
+using OfficeOpenXml.DataValidation;
+using OfficeOpenXml.Style;
 
 namespace AOSmith.Controllers
 {
@@ -154,6 +158,405 @@ namespace AOSmith.Controllers
             catch (Exception ex)
             {
                 return Json(new { success = false, message = ex.Message }, JsonRequestBehavior.AllowGet);
+            }
+        }
+
+        /// <summary>
+        /// Fetch item cost (stdcost) from Sage ItemSearch API
+        /// </summary>
+        [HttpPost]
+        public async Task<JsonResult> GetItemCost(string itemCode)
+        {
+            try
+            {
+                if (string.IsNullOrWhiteSpace(itemCode))
+                {
+                    return Json(new { success = false, message = "Item code is required" });
+                }
+
+                var response = await _sageService.SearchItemAsync(itemCode.Trim());
+                if (response?.icitems != null && response.icitems.Any())
+                {
+                    var item = response.icitems.FirstOrDefault();
+                    if (item != null)
+                    {
+                        return Json(new { success = true, cost = item.stdcost });
+                    }
+                }
+
+                return Json(new { success = false, message = "Item not found" });
+            }
+            catch (Exception ex)
+            {
+                return Json(new { success = false, message = ex.Message });
+            }
+        }
+
+        /// <summary>
+        /// Export an Excel template with data validation dropdowns populated from Sage API and DB
+        /// </summary>
+        [HttpGet]
+        public async Task<ActionResult> ExportTemplate()
+        {
+            try
+            {
+                // Fetch REC Types from DB
+                var recTypes = await _dbHelper.QueryAsync<RecTypeMaster>(
+                    "SELECT * FROM REC_Type_Master WHERE REC_Type IN (10, 12) ORDER BY REC_Order");
+                var recTypeList = recTypes.ToList();
+
+                // Fetch Items from Sage API
+                var itemsResponse = await _sageService.GetItemsAsync();
+                var sageItems = itemsResponse?.icitems?.Where(i => !i.inactive).ToList() ?? new List<SageItem>();
+
+                // Fetch Locations from Sage API
+                var locationsResponse = await _sageService.GetLocationsAsync();
+                var sageLocations = locationsResponse?.locations?.ToList() ?? new List<SageLocation>();
+
+                using (var package = new ExcelPackage())
+                {
+                    // ===== Main data entry sheet =====
+                    var ws = package.Workbook.Worksheets.Add("StockAdjustment");
+
+                    // Headers (4 columns: Adj Type, Item Code, Location, Quantity)
+                    var headers = new[] { "Adjustment Type", "Item Code", "Location", "Quantity" };
+                    for (int i = 0; i < headers.Length; i++)
+                    {
+                        ws.Cells[1, i + 1].Value = headers[i];
+                        ws.Cells[1, i + 1].Style.Font.Bold = true;
+                        ws.Cells[1, i + 1].Style.Fill.PatternType = ExcelFillStyle.Solid;
+                        ws.Cells[1, i + 1].Style.Fill.BackgroundColor.SetColor(System.Drawing.Color.FromArgb(79, 129, 189));
+                        ws.Cells[1, i + 1].Style.Font.Color.SetColor(System.Drawing.Color.White);
+                        ws.Cells[1, i + 1].Style.Border.BorderAround(ExcelBorderStyle.Thin);
+                    }
+
+                    // ===== Hidden "Lists" sheet for validation data =====
+                    var listSheet = package.Workbook.Worksheets.Add("Lists");
+                    listSheet.Hidden = eWorkSheetHidden.VeryHidden;
+
+                    // Column A: Adjustment Types (REC_Type - REC_Name2)
+                    listSheet.Cells[1, 1].Value = "AdjustmentType";
+                    for (int i = 0; i < recTypeList.Count; i++)
+                    {
+                        listSheet.Cells[i + 2, 1].Value = $"{recTypeList[i].REC_Type} - {recTypeList[i].REC_Name2}";
+                    }
+
+                    // Column B: Item Codes
+                    listSheet.Cells[1, 2].Value = "ItemCode";
+                    for (int i = 0; i < sageItems.Count; i++)
+                    {
+                        listSheet.Cells[i + 2, 2].Value = sageItems[i].itemno?.Trim();
+                    }
+
+                    // Column C: Locations
+                    listSheet.Cells[1, 3].Value = "Location";
+                    for (int i = 0; i < sageLocations.Count; i++)
+                    {
+                        listSheet.Cells[i + 2, 3].Value = sageLocations[i].location?.Trim();
+                    }
+
+                    // ===== Data Validation on main sheet (rows 2-1000) =====
+                    int dataRows = 1000;
+
+                    // Adjustment Type dropdown (Column A)
+                    if (recTypeList.Count > 0)
+                    {
+                        var adjValidation = ws.DataValidations.AddListValidation(
+                            ExcelCellBase.GetAddress(2, 1, dataRows, 1));
+                        adjValidation.ShowErrorMessage = true;
+                        adjValidation.ErrorTitle = "Invalid Adjustment Type";
+                        adjValidation.Error = "Please select a valid Adjustment Type from the dropdown.";
+                        adjValidation.Formula.ExcelFormula =
+                            $"Lists!$A$2:$A${recTypeList.Count + 1}";
+                    }
+
+                    // Item Code dropdown (Column B)
+                    if (sageItems.Count > 0)
+                    {
+                        var itemValidation = ws.DataValidations.AddListValidation(
+                            ExcelCellBase.GetAddress(2, 2, dataRows, 2));
+                        itemValidation.ShowErrorMessage = true;
+                        itemValidation.ErrorTitle = "Invalid Item Code";
+                        itemValidation.Error = "Please select a valid Item Code from the dropdown.";
+                        itemValidation.Formula.ExcelFormula =
+                            $"Lists!$B$2:$B${sageItems.Count + 1}";
+                    }
+
+                    // Location dropdown (Column C)
+                    if (sageLocations.Count > 0)
+                    {
+                        var locValidation = ws.DataValidations.AddListValidation(
+                            ExcelCellBase.GetAddress(2, 3, dataRows, 3));
+                        locValidation.ShowErrorMessage = true;
+                        locValidation.ErrorTitle = "Invalid Location";
+                        locValidation.Error = "Please select a valid Location from the dropdown.";
+                        locValidation.Formula.ExcelFormula =
+                            $"Lists!$C$2:$C${sageLocations.Count + 1}";
+                    }
+
+                    // Quantity - number validation (Column D)
+                    var qtyValidation = ws.DataValidations.AddDecimalValidation(
+                        ExcelCellBase.GetAddress(2, 4, dataRows, 4));
+                    qtyValidation.ShowErrorMessage = true;
+                    qtyValidation.ErrorTitle = "Invalid Quantity";
+                    qtyValidation.Error = "Quantity must be a positive number.";
+                    qtyValidation.Operator = ExcelDataValidationOperator.greaterThan;
+                    qtyValidation.Formula.Value = 0;
+
+                    // Auto-fit columns
+                    ws.Column(1).Width = 25;
+                    ws.Column(2).Width = 20;
+                    ws.Column(3).Width = 20;
+                    ws.Column(4).Width = 15;
+
+                    // Freeze header row
+                    ws.View.FreezePanes(2, 1);
+
+                    var fileBytes = package.GetAsByteArray();
+                    return File(fileBytes,
+                        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                        "StockAdjustment_Template.xlsx");
+                }
+            }
+            catch (Exception ex)
+            {
+                return Json(new { success = false, message = ex.Message }, JsonRequestBehavior.AllowGet);
+            }
+        }
+
+        /// <summary>
+        /// Import an Excel file, validate each cell against Sage data, return validated rows or errors.
+        /// Template has 4 columns: Adjustment Type, Item Code, Location, Quantity.
+        /// From/To locations are derived based on the Adjustment Type.
+        /// Cost is fetched from Sage ItemSearch API for each valid item.
+        /// </summary>
+        [HttpPost]
+        public async Task<JsonResult> ImportExcel()
+        {
+            try
+            {
+                if (Request.Files.Count == 0 || Request.Files[0] == null || Request.Files[0].ContentLength == 0)
+                {
+                    return Json(new { success = false, message = "No file uploaded." });
+                }
+
+                var file = Request.Files[0];
+                var ext = Path.GetExtension(file.FileName)?.ToLower();
+                if (ext != ".xlsx" && ext != ".xls")
+                {
+                    return Json(new { success = false, message = "Only Excel files (.xlsx) are supported." });
+                }
+
+                // Load master data for validation
+                var recTypes = (await _dbHelper.QueryAsync<RecTypeMaster>(
+                    "SELECT * FROM REC_Type_Master WHERE REC_Type IN (10, 12) ORDER BY REC_Order")).ToList();
+
+                var itemsResponse = await _sageService.GetItemsAsync();
+                var sageItems = itemsResponse?.icitems?.Where(i => !i.inactive).ToList() ?? new List<SageItem>();
+
+                var locationsResponse = await _sageService.GetLocationsAsync();
+                var sageLocations = locationsResponse?.locations?.ToList() ?? new List<SageLocation>();
+
+                // Get default location from App Options (for Stock Decrease To Location)
+                var appOptionsSql = @"SELECT TOP 1 RTRIM(APP_Default_Location) as AppDefaultLocation FROM APP_Options ORDER BY APP_ID";
+                var appOptions = (await _dbHelper.QueryAsync<ApplicationOptions>(appOptionsSql)).FirstOrDefault();
+                var defaultLocation = appOptions?.AppDefaultLocation?.Trim() ?? "";
+
+                // Build lookup sets (case-insensitive)
+                var validItemCodes = new HashSet<string>(
+                    sageItems.Select(i => i.itemno?.Trim().ToUpper()).Where(x => x != null),
+                    StringComparer.OrdinalIgnoreCase);
+
+                var validLocationCodes = new HashSet<string>(
+                    sageLocations.Select(l => l.location?.Trim().ToUpper()).Where(x => x != null),
+                    StringComparer.OrdinalIgnoreCase);
+
+                var recTypeMap = recTypes.ToDictionary(
+                    r => r.REC_Type,
+                    r => r.REC_Name2);
+
+                var errors = new List<object>();
+                var validRows = new List<object>();
+
+                using (var stream = file.InputStream)
+                using (var package = new ExcelPackage(stream))
+                {
+                    var ws = package.Workbook.Worksheets.FirstOrDefault();
+                    if (ws == null)
+                    {
+                        return Json(new { success = false, message = "Excel file has no worksheets." });
+                    }
+
+                    int totalRows = ws.Dimension?.End.Row ?? 0;
+                    if (totalRows < 2)
+                    {
+                        return Json(new { success = false, message = "Excel file has no data rows. Please fill in data starting from row 2." });
+                    }
+
+                    for (int row = 2; row <= totalRows; row++)
+                    {
+                        var adjTypeRaw = ws.Cells[row, 1].Text?.Trim(); // Column A
+                        var itemCode = ws.Cells[row, 2].Text?.Trim();   // Column B
+                        var location = ws.Cells[row, 3].Text?.Trim();   // Column C
+                        var qtyRaw = ws.Cells[row, 4].Text?.Trim();     // Column D
+
+                        // Skip completely empty rows
+                        if (string.IsNullOrWhiteSpace(adjTypeRaw) &&
+                            string.IsNullOrWhiteSpace(itemCode) &&
+                            string.IsNullOrWhiteSpace(location) &&
+                            string.IsNullOrWhiteSpace(qtyRaw))
+                        {
+                            continue;
+                        }
+
+                        bool rowHasError = false;
+
+                        // Validate Adjustment Type (expecting "10 - STOCK DECREASE" or "12 - STOCK INCREASE")
+                        int parsedRecType = 0;
+                        string recTypeName = "";
+                        if (string.IsNullOrWhiteSpace(adjTypeRaw))
+                        {
+                            errors.Add(new { row, column = "A", cell = $"A{row}", field = "Adjustment Type", message = "Adjustment Type is required." });
+                            rowHasError = true;
+                        }
+                        else
+                        {
+                            var parts = adjTypeRaw.Split(new[] { " - " }, StringSplitOptions.None);
+                            if (parts.Length >= 1 && int.TryParse(parts[0].Trim(), out parsedRecType) && recTypeMap.ContainsKey(parsedRecType))
+                            {
+                                recTypeName = recTypeMap[parsedRecType];
+                            }
+                            else
+                            {
+                                errors.Add(new { row, column = "A", cell = $"A{row}", field = "Adjustment Type", message = $"Invalid Adjustment Type '{adjTypeRaw}'. Use the dropdown values." });
+                                rowHasError = true;
+                            }
+                        }
+
+                        // Validate Item Code
+                        string itemDescription = "";
+                        decimal itemCost = 0;
+                        if (string.IsNullOrWhiteSpace(itemCode))
+                        {
+                            errors.Add(new { row, column = "B", cell = $"B{row}", field = "Item Code", message = "Item Code is required." });
+                            rowHasError = true;
+                        }
+                        else if (!validItemCodes.Contains(itemCode.ToUpper()))
+                        {
+                            errors.Add(new { row, column = "B", cell = $"B{row}", field = "Item Code", message = $"Item Code '{itemCode}' does not exist in Sage." });
+                            rowHasError = true;
+                        }
+                        else
+                        {
+                            var foundItem = sageItems.FirstOrDefault(i =>
+                                string.Equals(i.itemno?.Trim(), itemCode, StringComparison.OrdinalIgnoreCase));
+                            itemDescription = foundItem?.desc?.Trim() ?? "";
+                            itemCost = foundItem?.stdcost ?? 0;
+                        }
+
+                        // Validate Location
+                        string locationName = "";
+                        if (string.IsNullOrWhiteSpace(location))
+                        {
+                            errors.Add(new { row, column = "C", cell = $"C{row}", field = "Location", message = "Location is required." });
+                            rowHasError = true;
+                        }
+                        else if (!validLocationCodes.Contains(location.ToUpper()))
+                        {
+                            errors.Add(new { row, column = "C", cell = $"C{row}", field = "Location", message = $"Location '{location}' does not exist in Sage." });
+                            rowHasError = true;
+                        }
+                        else
+                        {
+                            var foundLoc = sageLocations.FirstOrDefault(l =>
+                                string.Equals(l.location?.Trim(), location, StringComparison.OrdinalIgnoreCase));
+                            locationName = $"{foundLoc?.location?.Trim()} - {foundLoc?.desc?.Trim()}";
+                        }
+
+                        // Validate Quantity
+                        decimal parsedQty = 0;
+                        if (string.IsNullOrWhiteSpace(qtyRaw))
+                        {
+                            errors.Add(new { row, column = "D", cell = $"D{row}", field = "Quantity", message = "Quantity is required." });
+                            rowHasError = true;
+                        }
+                        else if (!decimal.TryParse(qtyRaw, out parsedQty) || parsedQty <= 0)
+                        {
+                            errors.Add(new { row, column = "D", cell = $"D{row}", field = "Quantity", message = $"Quantity '{qtyRaw}' must be a positive number." });
+                            rowHasError = true;
+                        }
+
+                        if (!rowHasError)
+                        {
+                            // Derive From/To based on Adjustment Type
+                            string fromLoc, toLoc, fromLocName, toLocName;
+                            if (parsedRecType == 12)
+                            {
+                                // Stock Increase: both From and To = selected Location
+                                fromLoc = location.Trim();
+                                toLoc = location.Trim();
+                                fromLocName = locationName;
+                                toLocName = locationName;
+                            }
+                            else
+                            {
+                                // Stock Decrease (10): From = selected Location, To = default from App Options
+                                fromLoc = location.Trim();
+                                toLoc = defaultLocation;
+                                fromLocName = locationName;
+                                var defLocObj = sageLocations.FirstOrDefault(l =>
+                                    string.Equals(l.location?.Trim(), defaultLocation, StringComparison.OrdinalIgnoreCase));
+                                toLocName = defLocObj != null
+                                    ? $"{defLocObj.location?.Trim()} - {defLocObj.desc?.Trim()}"
+                                    : defaultLocation;
+                            }
+
+                            validRows.Add(new
+                            {
+                                recType = parsedRecType,
+                                recTypeName = $"{parsedRecType} - {recTypeName}",
+                                itemCode = itemCode?.Trim(),
+                                itemDescription,
+                                location = location?.Trim(),
+                                locationName,
+                                fromLocation = fromLoc,
+                                fromLocationName = fromLocName,
+                                toLocation = toLoc,
+                                toLocationName = toLocName,
+                                qty = parsedQty,
+                                cost = itemCost
+                            });
+                        }
+                    }
+                }
+
+                if (errors.Any())
+                {
+                    return Json(new
+                    {
+                        success = false,
+                        message = $"Found {errors.Count} error(s) in the uploaded file.",
+                        errors,
+                        validRowCount = validRows.Count,
+                        totalErrorCount = errors.Count
+                    });
+                }
+
+                if (!validRows.Any())
+                {
+                    return Json(new { success = false, message = "No valid data rows found in the file." });
+                }
+
+                return Json(new
+                {
+                    success = true,
+                    message = $"{validRows.Count} row(s) imported successfully.",
+                    data = validRows
+                });
+            }
+            catch (Exception ex)
+            {
+                return Json(new { success = false, message = "Error processing Excel file: " + ex.Message });
             }
         }
 

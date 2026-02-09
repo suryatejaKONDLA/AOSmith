@@ -14,6 +14,7 @@ namespace AOSmith.Services
         private const string SageTransferApiUrl = "https://sagetest.aosmith.in/Sage300.WebAPI2024/api/TransferEntry";
         private const string SageAdjustmentApiUrl = "https://sagetest.aosmith.in/Sage300.WebAPI2024/api/AdjustmentEntry";
         private const string SageItemsApiUrl = "https://sagetest.aosmith.in/Sage300.WebAPI2024/api/icitems";
+        private const string SageItemSearchApiUrl = "https://sagetest.aosmith.in/Sage300.WebAPI2024/api/ItemSearch";
         private const string SageLocationsApiUrl = "https://sagetest.aosmith.in/Sage300.WebAPI2024/api/Locations";
         private const string SageUserId = "ADMIN";
         private const string SagePassword = "Sage@123$";
@@ -333,6 +334,35 @@ namespace AOSmith.Services
                     locations = new List<SageLocation>(),
                     status = -1,
                     Errors = new List<string> { $"Failed to fetch locations: {ex.Message}" }
+                };
+            }
+        }
+
+        // ========== Item Search API (for stdcost) ==========
+
+        /// <summary>
+        /// Search a specific item from Sage300 ItemSearch API to get stdcost and optional fields.
+        /// This calls the endpoint directly each time (no caching).
+        /// </summary>
+        public async Task<SageItemResponse> SearchItemAsync(string itemNo)
+        {
+            try
+            {
+                var url = $"{SageItemSearchApiUrl}?userid={Uri.EscapeDataString(SageUserId)}&password={Uri.EscapeDataString(SagePassword)}&companyid={Uri.EscapeDataString(SageCompanyId)}&itemno={Uri.EscapeDataString(itemNo)}&optfield=HSNCODE";
+
+                var response = await _httpClient.GetAsync(url);
+                var responseBody = await response.Content.ReadAsStringAsync();
+
+                var result = JsonConvert.DeserializeObject<SageItemResponse>(responseBody);
+                return result ?? new SageItemResponse { icitems = new List<SageItem>(), status = -1 };
+            }
+            catch (Exception ex)
+            {
+                return new SageItemResponse
+                {
+                    icitems = new List<SageItem>(),
+                    status = -1,
+                    Errors = new List<string> { $"Failed to search item: {ex.Message}" }
                 };
             }
         }
