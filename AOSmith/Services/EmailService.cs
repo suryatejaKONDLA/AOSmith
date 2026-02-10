@@ -56,9 +56,9 @@ namespace AOSmith.Services
         /// </summary>
         private async Task<List<ApproverInfo>> GetApproversByLevelAsync(int level)
         {
-            var query = @"SELECT Login_ID AS UserId, Login_Name AS Name, Login_Email_ID AS Email, 
+            var query = @"SELECT Login_ID AS UserId, Login_Name AS Name, Login_Email_ID AS Email,
                           Login_Approval_Level AS ApprovalLevel
-                          FROM dbo.Login_Master 
+                          FROM dbo.Login_Master
                           WHERE Login_Is_Approver = 1 AND Login_Approval_Level = @Level AND Login_Active_Flag = 1";
             var parameters = new Dictionary<string, object> { { "@Level", level } };
             var approvers = await _dbHelper.QueryAsync<ApproverInfo>(query, parameters);
@@ -70,10 +70,10 @@ namespace AOSmith.Services
         /// </summary>
         private async Task<List<ApproverInfo>> GetApproversUpToLevelAsync(int level)
         {
-            var query = @"SELECT Login_ID AS UserId, Login_Name AS Name, Login_Email_ID AS Email, 
+            var query = @"SELECT Login_ID AS UserId, Login_Name AS Name, Login_Email_ID AS Email,
                           Login_Approval_Level AS ApprovalLevel
-                          FROM dbo.Login_Master 
-                          WHERE Login_Is_Approver = 1 AND Login_Approval_Level < @Level 
+                          FROM dbo.Login_Master
+                          WHERE Login_Is_Approver = 1 AND Login_Approval_Level < @Level
                           AND Login_Active_Flag = 1 ORDER BY Login_Approval_Level";
             var parameters = new Dictionary<string, object> { { "@Level", level } };
             var approvers = await _dbHelper.QueryAsync<ApproverInfo>(query, parameters);
@@ -85,11 +85,11 @@ namespace AOSmith.Services
         /// </summary>
         private async Task<ApproverInfo> GetDocumentCreatorAsync(int finYear, int recType, int recNumber)
         {
-            var query = @"SELECT TOP 1 lm.Login_ID AS UserId, lm.Login_Name AS Name, 
+            var query = @"SELECT TOP 1 lm.Login_ID AS UserId, lm.Login_Name AS Name,
                           lm.Login_Email_ID AS Email, ISNULL(lm.Login_Approval_Level, 0) AS ApprovalLevel
                           FROM Stock_Adjustment sa
                           INNER JOIN Login_Master lm ON sa.Stock_Created_ID = lm.Login_ID
-                          WHERE sa.Stock_FIN_Year = @FinYear AND sa.Stock_REC_Type = @RecType 
+                          WHERE sa.Stock_FIN_Year = @FinYear AND sa.Stock_REC_Type = @RecType
                           AND sa.Stock_REC_Number = @RecNumber";
             var parameters = new Dictionary<string, object>
             {
@@ -105,14 +105,14 @@ namespace AOSmith.Services
         /// </summary>
         private async Task<List<EmailLineItem>> GetLineItemsAsync(int finYear, int recType, int recNumber)
         {
-            var query = @"SELECT 
+            var query = @"SELECT
                             sa.Stock_REC_SNO AS Sno,
                             RTRIM(sa.Stock_Item_Code) AS ItemCode,
                             RTRIM(sa.Stock_From_Location) AS FromLocation,
                             RTRIM(sa.Stock_To_Location) AS ToLocation,
                             sa.Stock_Qty AS Quantity
                           FROM Stock_Adjustment sa
-                          WHERE sa.Stock_FIN_Year = @FinYear AND sa.Stock_REC_Type = @RecType 
+                          WHERE sa.Stock_FIN_Year = @FinYear AND sa.Stock_REC_Type = @RecType
                           AND sa.Stock_REC_Number = @RecNumber
                           ORDER BY sa.Stock_REC_SNO";
             var parameters = new Dictionary<string, object>

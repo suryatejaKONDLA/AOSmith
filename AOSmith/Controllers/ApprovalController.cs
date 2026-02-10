@@ -420,7 +420,7 @@ namespace AOSmith.Controllers
                     try
                     {
                         var approverName = SessionHelper.GetUserName() ?? "Unknown";
-                        var docRefQuery = @"SELECT TOP 1 
+                        var docRefQuery = @"SELECT TOP 1
                             CAST(sa.Stock_FIN_Year AS VARCHAR(10)) + '/' + rm.REC_Name + '/' + CAST(sa.Stock_REC_Number AS VARCHAR(10)) AS DocumentReference
                             FROM Stock_Adjustment sa
                             INNER JOIN REC_Type_Master rm ON sa.Stock_REC_Type = rm.REC_Type
@@ -532,7 +532,7 @@ namespace AOSmith.Controllers
                         try
                         {
                             var approverNameFull = SessionHelper.GetUserName() ?? "Unknown";
-                            var docRefQueryFull = @"SELECT TOP 1 
+                            var docRefQueryFull = @"SELECT TOP 1
                                 CAST(sa.Stock_FIN_Year AS VARCHAR(10)) + '/' + rm.REC_Name + '/' + CAST(sa.Stock_REC_Number AS VARCHAR(10)) AS DocumentReference
                                 FROM Stock_Adjustment sa
                                 INNER JOIN REC_Type_Master rm ON sa.Stock_REC_Type = rm.REC_Type
@@ -551,7 +551,7 @@ namespace AOSmith.Controllers
                         try
                         {
                             var approverNamePartial = SessionHelper.GetUserName() ?? "Unknown";
-                            var docRefQueryPartial = @"SELECT TOP 1 
+                            var docRefQueryPartial = @"SELECT TOP 1
                                 CAST(sa.Stock_FIN_Year AS VARCHAR(10)) + '/' + rm.REC_Name + '/' + CAST(sa.Stock_REC_Number AS VARCHAR(10)) AS DocumentReference
                                 FROM Stock_Adjustment sa
                                 INNER JOIN REC_Type_Master rm ON sa.Stock_REC_Type = rm.REC_Type
