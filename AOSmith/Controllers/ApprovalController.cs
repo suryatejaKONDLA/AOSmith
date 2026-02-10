@@ -17,17 +17,20 @@ namespace AOSmith.Controllers
     {
         private readonly IDatabaseHelper _databaseHelper;
         private readonly SageApiService _sageService;
+        private readonly EmailService _emailService;
 
         public ApprovalController()
         {
             _databaseHelper = new DatabaseHelper();
             _sageService = new SageApiService();
+            _emailService = new EmailService();
         }
 
         public ApprovalController(IDatabaseHelper databaseHelper)
         {
             _databaseHelper = databaseHelper;
             _sageService = new SageApiService();
+            _emailService = new EmailService(databaseHelper);
         }
 
         // GET: Approval
@@ -319,6 +322,7 @@ namespace AOSmith.Controllers
 
                 // On rejection → create reversal records (RecType 14) with swapped locations via SP
                 string reversalDocRef = null;
+                SageTransferEntryResponse sageTransferResponse = null;
                 if (action.ToLower() == "reject")
                 {
                     var reversalParams = new List<System.Data.SqlClient.SqlParameter>
@@ -336,11 +340,102 @@ namespace AOSmith.Controllers
                     {
                         reversalDocRef = reversalResult.ResultMessage;
                         message += $" {reversalResult.ResultMessage}";
+
+                        // Extract the new reversal RecNumber from the ResultMessage
+                        // Format: "Reversal entry 202526/STRV/1 created for 202526/STIN/1."
+                        int reversalRecNumber = ExtractReversalRecNumber(reversalResult.ResultMessage);
+
+                        if (reversalRecNumber > 0)
+                        {
+                            // Fetch the reversal line items (RecType 14) from DB
+                            var reversalLineItemsQuery = @"
+                                SELECT
+                                    sa.Stock_REC_SNO AS StockRecSno,
+                                    sa.Stock_REC_Type AS RecType,
+                                    RTRIM(sa.Stock_From_Location) AS FromLocation,
+                                    RTRIM(sa.Stock_To_Location) AS ToLocation,
+                                    RTRIM(sa.Stock_Item_Code) AS ItemCode,
+                                    '' AS ItemDescription,
+                                    sa.Stock_Qty AS Qty
+                                FROM Stock_Adjustment sa
+                                WHERE sa.Stock_FIN_Year = @FinYear
+                                AND sa.Stock_REC_Type = 14
+                                AND sa.Stock_REC_Number = @RecNumber
+                                ORDER BY sa.Stock_REC_SNO";
+
+                            var reversalLineParams = new Dictionary<string, object>
+                            {
+                                { "@FinYear", finYear },
+                                { "@RecNumber", reversalRecNumber }
+                            };
+
+                            var reversalLineItems = await _databaseHelper.QueryAsync<StockAdjustmentLineItem>(
+                                reversalLineItemsQuery, reversalLineParams);
+
+                            if (reversalLineItems != null && reversalLineItems.Any())
+                            {
+                                // Get the transaction date from the reversal records
+                                var reversalDateQuery = @"
+                                    SELECT TOP 1 Stock_Date AS Value
+                                    FROM Stock_Adjustment
+                                    WHERE Stock_FIN_Year = @FinYear
+                                    AND Stock_REC_Type = 14
+                                    AND Stock_REC_Number = @RecNumber";
+
+                                var reversalDateRow = await _databaseHelper.QuerySingleAsync<DateResult>(
+                                    reversalDateQuery, reversalLineParams);
+                                var reversalTransDate = reversalDateRow?.Value ?? DateTime.Now;
+
+                                // Send reversal data to Sage Transfer API
+                                sageTransferResponse = await _sageService.SendTransferEntryAsync(
+                                    reversalLineItems, reversalTransDate, reversalRecNumber, 14);
+
+                                if (sageTransferResponse != null && sageTransferResponse.Status?.ToLower() != "error")
+                                {
+                                    // Mark reversal records as sent to Sage
+                                    var reversalSageSentQuery = @"
+                                        UPDATE Stock_Adjustment
+                                        SET Stock_Sage_Data_Sent = 1,
+                                            Stock_Sage_Sent_Date = GETDATE()
+                                        WHERE Stock_FIN_Year = @FinYear
+                                        AND Stock_REC_Type = 14
+                                        AND Stock_REC_Number = @RecNumber";
+
+                                    await _databaseHelper.ExecuteNonQueryAsync(reversalSageSentQuery, reversalLineParams);
+                                    message += $" Sage Transfer API called successfully.";
+                                }
+                                else
+                                {
+                                    message += $" Sage Transfer API failed: {sageTransferResponse?.Message}";
+                                }
+                            }
+                        }
                     }
                     else
                     {
                         message += $" Reversal creation failed: {reversalResult.ResultMessage}";
                     }
+
+                    // Send rejection email to previous level approvers and creator
+                    try
+                    {
+                        var approverName = SessionHelper.GetUserName() ?? "Unknown";
+                        var docRefQuery = @"SELECT TOP 1 
+                            CAST(sa.Stock_FIN_Year AS VARCHAR(10)) + '/' + rm.REC_Name + '/' + CAST(sa.Stock_REC_Number AS VARCHAR(10)) AS DocumentReference
+                            FROM Stock_Adjustment sa
+                            INNER JOIN REC_Type_Master rm ON sa.Stock_REC_Type = rm.REC_Type
+                            WHERE sa.Stock_FIN_Year = @FinYear AND sa.Stock_REC_Type = @RecType AND sa.Stock_REC_Number = @RecNumber";
+                        var docRefParams = new Dictionary<string, object>
+                        {
+                            { "@FinYear", finYear }, { "@RecType", recType }, { "@RecNumber", recNumber }
+                        };
+                        var docRefResult = await _databaseHelper.QuerySingleAsync<DocRefResult>(docRefQuery, docRefParams);
+                        var docRef = docRefResult?.DocumentReference ?? $"{finYear}/{recType}/{recNumber}";
+
+                        await _emailService.SendRejectionEmailAsync(
+                            finYear, recType, recNumber, docRef, userApprovalLevel, approverName, remarks);
+                    }
+                    catch { /* email failure should not break approval flow */ }
                 }
 
                 // Check if all levels are now fully approved → trigger Sage Adjustment Entry API
@@ -432,6 +527,46 @@ namespace AOSmith.Controllers
 
                             message = $"Document fully approved! Sage Adjustment Entry API called.";
                         }
+
+                        // Send fully approved email to creator
+                        try
+                        {
+                            var approverNameFull = SessionHelper.GetUserName() ?? "Unknown";
+                            var docRefQueryFull = @"SELECT TOP 1 
+                                CAST(sa.Stock_FIN_Year AS VARCHAR(10)) + '/' + rm.REC_Name + '/' + CAST(sa.Stock_REC_Number AS VARCHAR(10)) AS DocumentReference
+                                FROM Stock_Adjustment sa
+                                INNER JOIN REC_Type_Master rm ON sa.Stock_REC_Type = rm.REC_Type
+                                WHERE sa.Stock_FIN_Year = @FinYear AND sa.Stock_REC_Type = @RecType AND sa.Stock_REC_Number = @RecNumber";
+                            var docRefResultFull = await _databaseHelper.QuerySingleAsync<DocRefResult>(docRefQueryFull, lineItemParams);
+                            var docRefFull = docRefResultFull?.DocumentReference ?? $"{finYear}/{recType}/{recNumber}";
+
+                            await _emailService.SendFullyApprovedEmailAsync(
+                                finYear, recType, recNumber, docRefFull, approverNameFull);
+                        }
+                        catch { /* email failure should not break approval flow */ }
+                    }
+                    else
+                    {
+                        // Not fully approved yet → send email to next level approver
+                        try
+                        {
+                            var approverNamePartial = SessionHelper.GetUserName() ?? "Unknown";
+                            var docRefQueryPartial = @"SELECT TOP 1 
+                                CAST(sa.Stock_FIN_Year AS VARCHAR(10)) + '/' + rm.REC_Name + '/' + CAST(sa.Stock_REC_Number AS VARCHAR(10)) AS DocumentReference
+                                FROM Stock_Adjustment sa
+                                INNER JOIN REC_Type_Master rm ON sa.Stock_REC_Type = rm.REC_Type
+                                WHERE sa.Stock_FIN_Year = @FinYear AND sa.Stock_REC_Type = @RecType AND sa.Stock_REC_Number = @RecNumber";
+                            var docRefParamsPartial = new Dictionary<string, object>
+                            {
+                                { "@FinYear", finYear }, { "@RecType", recType }, { "@RecNumber", recNumber }
+                            };
+                            var docRefResultPartial = await _databaseHelper.QuerySingleAsync<DocRefResult>(docRefQueryPartial, docRefParamsPartial);
+                            var docRefPartial = docRefResultPartial?.DocumentReference ?? $"{finYear}/{recType}/{recNumber}";
+
+                            await _emailService.SendApprovalEmailToNextLevelAsync(
+                                finYear, recType, recNumber, docRefPartial, userApprovalLevel, approverNamePartial);
+                        }
+                        catch { /* email failure should not break approval flow */ }
                     }
                 }
 
@@ -452,18 +587,55 @@ namespace AOSmith.Controllers
                     };
                 }
 
+                // Build Sage Transfer response for reversal
+                object sageTransferResponseObj = null;
+                if (sageTransferResponse != null)
+                {
+                    sageTransferResponseObj = new
+                    {
+                        status = sageTransferResponse.Status,
+                        message = sageTransferResponse.Message,
+                        docNum = sageTransferResponse.DocNum,
+                        transferNumber = sageTransferResponse.TransferNumber,
+                        rawRequest = sageTransferResponse.RawRequest,
+                        rawResponse = sageTransferResponse.RawResponse
+                    };
+                }
+
                 return Json(new
                 {
                     success = true,
                     message = message,
                     isFullyApproved = isFullyApproved,
-                    sageResponse = sageResponseObj
+                    sageResponse = sageResponseObj,
+                    sageTransferResponse = sageTransferResponseObj
                 });
             }
             catch (Exception ex)
             {
                 return Json(new { success = false, message = ex.Message });
             }
+        }
+
+        /// <summary>
+        /// Extracts the reversal RecNumber from the SP result message.
+        /// Expected format: "Reversal entry 202526/STRV/3 created for 202526/STIN/1."
+        /// </summary>
+        private int ExtractReversalRecNumber(string resultMessage)
+        {
+            if (string.IsNullOrEmpty(resultMessage)) return 0;
+
+            // Match the reversal document reference: "Reversal entry XXXXXX/XXXX/N"
+            var match = System.Text.RegularExpressions.Regex.Match(
+                resultMessage, @"Reversal entry \d+/[A-Z]+/(\d+)",
+                System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+
+            if (match.Success && int.TryParse(match.Groups[1].Value, out var recNum))
+            {
+                return recNum;
+            }
+
+            return 0;
         }
 
         /// <summary>
@@ -550,5 +722,13 @@ namespace AOSmith.Controllers
     public class DateResult
     {
         public DateTime Value { get; set; }
+    }
+
+    /// <summary>
+    /// Helper class for document reference queries
+    /// </summary>
+    public class DocRefResult
+    {
+        public string DocumentReference { get; set; }
     }
 }

@@ -20,6 +20,7 @@ namespace AOSmith.Controllers
     {
         private readonly IDatabaseHelper _dbHelper = new DatabaseHelper();
         private readonly SageApiService _sageService = new SageApiService();
+        private readonly EmailService _emailService = new EmailService();
 
         public async Task<ActionResult> Create()
         {
@@ -692,12 +693,26 @@ namespace AOSmith.Controllers
                     {
                         successMessages.Add(result.ResultMessage);
 
+                        // Extract document info for email
+                        var recNumber = ExtractRecNumber(result.ResultMessage);
+                        var documentReference = ExtractDocumentReference(result.ResultMessage);
+
+                        // Send email notification to L1 approver (non-blocking)
+                        try
+                        {
+                            var finYear = 0;
+                            var finYearMatch = System.Text.RegularExpressions.Regex.Match(
+                                result.ResultMessage, @"(\d{6})/",
+                                System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+                            if (finYearMatch.Success) int.TryParse(finYearMatch.Groups[1].Value, out finYear);
+
+                            await _emailService.SendRecordCreatedEmailAsync(finYear, recType, recNumber, documentReference);
+                        }
+                        catch { /* email failure should not break save */ }
+
                         // RecType 10 (Stock Decrease) → send to Sage Transfer Entry immediately
                         if (recType == 10)
                         {
-                            var recNumber = ExtractRecNumber(result.ResultMessage);
-                            var documentReference = ExtractDocumentReference(result.ResultMessage);
-
                             var sageResponse = await _sageService.SendTransferEntryAsync(
                                 items, transactionDate, recNumber, recType);
 

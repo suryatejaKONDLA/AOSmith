@@ -480,6 +480,8 @@
                     if (response.success) {
                         if (response.isFullyApproved && response.sageResponse) {
                             showSageResponseModal(response.sageResponse, response.message);
+                        } else if (response.sageTransferResponse) {
+                            showSageResponseModal(response.sageTransferResponse, response.message);
                         } else {
                             alert(response.message);
                         }
@@ -515,6 +517,9 @@
             }
             if (sageData.docNum) {
                 msgHtml += '<br/><small>Doc #: ' + sageData.docNum + '</small>';
+            }
+            if (sageData.transferNumber) {
+                msgHtml += '<br/><small>Transfer #: ' + sageData.transferNumber + '</small>';
             }
             msgHtml += '</div>';
             $('#sageMessage').html(msgHtml);

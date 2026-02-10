@@ -121,14 +121,15 @@ namespace AOSmith.Services
         {
             var transDateStr = transactionDate.ToString("yyyy-MM-ddTHH:mm:ss");
             var expArDateStr = transactionDate.AddMonths(1).ToString("yyyy-MM-ddTHH:mm:ss");
-            var recTypeName = recType == 12 ? "INCREASE" : "DECREASE";
+            var recTypeName = recType == 12 ? "INCREASE" : recType == 14 ? "REVERSAL" : "DECREASE";
+            var docPrefix = recType == 14 ? "REV" : recType == 12 ? "ADJ" : "TRN";
 
             var request = new SageTransferEntryRequest
             {
                 UserId = SageUserId,
                 Password = SagePassword,
                 CompanyId = SageCompanyId,
-                DocNum = $"TRN{recNumber.ToString().PadLeft(6, '0')}",
+                DocNum = $"{docPrefix}{recNumber.ToString().PadLeft(6, '0')}",
                 Reference = $"INV-ADJ-{transactionDate:yyyy}-{recNumber.ToString().PadLeft(2, '0')}",
                 TransDate = transDateStr,
                 ExpArDate = expArDateStr,
@@ -232,7 +233,7 @@ namespace AOSmith.Services
                 Location = location?.Trim(),
                 TransDate = transDateStr,
                 HdrDesc = $"Stock Increase adjustment #{recNumber} - Approved",
-                TransType = 1,
+                TransType = 5,
                 AdjHeaderOptFields = new List<SageOptField>(),
                 Items = lineItems.Select(item => new SageAdjustmentItem
                 {
