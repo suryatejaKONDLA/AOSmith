@@ -57,6 +57,8 @@ namespace AOSmith.Models
         public string ToLocation { get; set; }
         public string ToLocationName { get; set; }
         public decimal Quantity { get; set; }
+        public decimal Cost { get; set; }
+        public decimal Amount { get; set; }
     }
 
     /// <summary>

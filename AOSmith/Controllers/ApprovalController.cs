@@ -151,7 +151,9 @@ namespace AOSmith.Controllers
                         '' AS FromLocationName,
                         RTRIM(sa.Stock_To_Location) AS ToLocation,
                         '' AS ToLocationName,
-                        sa.Stock_Qty AS Quantity
+                        sa.Stock_Qty AS Quantity,
+                        ISNULL(sa.Stock_Cost, 0) AS Cost,
+                        ISNULL(sa.Stock_Qty * sa.Stock_Cost, 0) AS Amount
                     FROM Stock_Adjustment sa
                     WHERE sa.Stock_REC_Type IN (10, 12)
                     ORDER BY sa.Stock_FIN_Year, sa.Stock_REC_Number, sa.Stock_REC_SNO";
@@ -200,7 +202,9 @@ namespace AOSmith.Controllers
                             li.FromLocationName,
                             li.ToLocation,
                             li.ToLocationName,
-                            li.Quantity
+                            li.Quantity,
+                            li.Cost,
+                            li.Amount
                         }).ToList()
                 }).ToList();
 

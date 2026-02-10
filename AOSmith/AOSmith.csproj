@@ -140,6 +140,8 @@
     <Compile Include="Helpers\IDatabaseHelper.cs" />
     <Compile Include="Helpers\SessionHelper.cs" />
     <Compile Include="Models\ApplicationOptions.cs" />
+    <Compile Include="Models\ApprovalAmountThreshold.cs" />
+    <Compile Include="Models\LastRecordNumber.cs" />
     <Compile Include="Models\ApprovalStatusConstants.cs" />
     <Compile Include="Models\ApprovalStatusConstants2.cs" />
     <Compile Include="Models\ApprovalStatusMaster.cs" />

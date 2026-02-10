@@ -16,6 +16,7 @@ namespace AOSmith.Models
         public string StockToLocation { get; set; }
         public string StockItemCode { get; set; }
         public decimal StockQty { get; set; }
+        public decimal StockCost { get; set; }
 
         // Audit Fields
         public int StockCreatedId { get; set; }

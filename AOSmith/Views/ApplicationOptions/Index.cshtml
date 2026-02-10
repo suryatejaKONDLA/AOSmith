@@ -16,7 +16,6 @@
     .select2-container--bootstrap-5.select2-container--focus .select2-selection,
     .select2-container--bootstrap-5.select2-container--open .select2-selection { border-color: #004d26 !important; box-shadow: 0 0 0 0.25rem rgba(0,77,38,.25) !important; }
     .select2-dropdown { z-index: 10060; border-color: #ced4da; }
-    /* Hover highlight */
     .select2-results__option--highlighted,
     .select2-results__option--highlighted[aria-selected],
     .select2-results__option--highlighted[aria-selected="true"],
@@ -25,22 +24,25 @@
     .select2-container--bootstrap-5 .select2-results__option--highlighted[aria-selected],
     .select2-container--default .select2-results__option--highlighted[aria-selected],
     .select2-container--default .select2-results__option--highlighted.select2-results__option--selectable { background-color: rgba(0,77,38,.12) !important; color: #004d26 !important; }
-    /* Selected option */
     .select2-results__option[aria-selected="true"],
     .select2-results__option--selected,
     .select2-container--bootstrap-5 .select2-results__option--selected,
     .select2-container--bootstrap-5 .select2-results__option[aria-selected="true"],
     .select2-container--default .select2-results__option--selected { background-color: rgba(0,77,38,.08) !important; color: #004d26 !important; }
-    /* Search field */
     .select2-container--bootstrap-5 .select2-search--dropdown .select2-search__field,
     .select2-search--dropdown .select2-search__field { border: 1px solid #ced4da; border-radius: 0.375rem; padding: 0.375rem 0.75rem; }
     .select2-container--bootstrap-5 .select2-search--dropdown .select2-search__field:focus,
     .select2-search--dropdown .select2-search__field:focus { border-color: #004d26 !important; box-shadow: 0 0 0 0.25rem rgba(0,77,38,.25) !important; outline: none; }
+
+    /* Tab styling - AO Smith green */
+    .nav-tabs .nav-link { color: #004d26; font-weight: 600; }
+    .nav-tabs .nav-link.active { color: #fff; background-color: #004d26; border-color: #004d26; }
+    .nav-tabs .nav-link:hover:not(.active) { color: #004d26; background-color: rgba(0,77,38,.08); border-color: rgba(0,77,38,.25); }
 </style>
 
 <div class="container-fluid mt-4">
     <div class="row justify-content-center">
-        <div class="col-lg-8 col-md-10">
+        <div class="col-lg-10 col-md-12">
             <div class="card shadow-sm border-0">
                 <div class="card-header bg-primary text-white">
                     <h4 class="mb-0">
@@ -48,62 +50,170 @@
                     </h4>
                 </div>
                 <div class="card-body p-4">
-                    @using (Html.BeginForm("Save", "ApplicationOptions", FormMethod.Post, new { id = "appOptionsForm" }))
-                    {
-                        @Html.AntiForgeryToken()
-                        @Html.HiddenFor(m => m.AppId)
 
-                        <div class="row g-4">
-                            <!-- Default Location -->
-                            <div class="col-md-6">
-                                <div class="form-group">
-                                    <label for="AppDefaultLocation" class="form-label fw-semibold">
-                                        Default Location <span class="text-danger">*</span>
-                                    </label>
-                                    @Html.DropDownListFor(m => m.AppDefaultLocation,
-                                        (SelectList)ViewBag.Locations,
-                                        "-- Select Default Location --",
-                                        new { @class = "form-select", required = "required", id = "AppDefaultLocation" })
-                                    <small class="text-muted">This location will be used as default for transactions</small>
-                                </div>
+                    <!-- Bootstrap Tabs -->
+                    <ul class="nav nav-tabs mb-4" id="appOptionsTabs" role="tablist">
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link active" id="tab-lastrecord" data-bs-toggle="tab" data-bs-target="#pane-lastrecord"
+                                    type="button" role="tab" aria-controls="pane-lastrecord" aria-selected="true">
+                                <i class="bi bi-hash me-1"></i> Last Record Numbers
+                            </button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link" id="tab-defaults" data-bs-toggle="tab" data-bs-target="#pane-defaults"
+                                    type="button" role="tab" aria-controls="pane-defaults" aria-selected="false">
+                                <i class="bi bi-sliders me-1"></i> App Defaults
+                            </button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link" id="tab-thresholds" data-bs-toggle="tab" data-bs-target="#pane-thresholds"
+                                    type="button" role="tab" aria-controls="pane-thresholds" aria-selected="false">
+                                <i class="bi bi-cash-stack me-1"></i> Approval Amount Threshold
+                            </button>
+                        </li>
+                    </ul>
+
+                    <div class="tab-content" id="appOptionsTabContent">
+                        <!-- ===================== TAB 0: LAST RECORD NUMBERS ===================== -->
+                        <div class="tab-pane fade show active" id="pane-lastrecord" role="tabpanel" aria-labelledby="tab-lastrecord">
+
+                            <div class="alert alert-secondary border-0 mb-4">
+                                <i class="bi bi-info-circle me-2"></i>
+                                Shows the <strong>last record number</strong>, date and time for each transaction type.
                             </div>
 
-                            <!-- Transaction Document Series -->
-                            <div class="col-md-6">
-                                <div class="form-group">
-                                    <label for="AppTranDocSeries" class="form-label fw-semibold">
-                                        Transaction Document Series <span class="text-danger">*</span>
-                                    </label>
-                                    @Html.TextBoxFor(m => m.AppTranDocSeries,
-                                        new { @class = "form-control",
-                                              placeholder = "e.g., SA, STK",
-                                              maxlength = "10",
-                                              required = "required" })
-                                    <small class="text-muted">Document series prefix for transactions (max 10 characters)</small>
+                            <!-- Loading spinner -->
+                            <div id="lastRecSpinner" class="text-center py-4">
+                                <div class="spinner-border text-primary" role="status">
+                                    <span class="visually-hidden">Loading...</span>
                                 </div>
+                                <p class="mt-2 text-muted">Loading last record details...</p>
+                            </div>
+
+                            <!-- Last Record Table -->
+                            <div class="table-responsive">
+                                <table class="table table-bordered table-hover align-middle" id="lastRecTable" style="display:none;">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th style="width:12%;" class="text-center">Type Code</th>
+                                            <th style="width:28%;">Description</th>
+                                            <th style="width:20%;" class="text-center">Last Record #</th>
+                                            <th style="width:20%;" class="text-center">Date</th>
+                                            <th style="width:20%;" class="text-center">Time</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="lastRecTableBody">
+                                    </tbody>
+                                </table>
                             </div>
                         </div>
 
-                        if (Model.AppModifiedDateTime != null)
-                        {
-                            <div class="row mt-4">
-                                <div class="col-12">
-                                    <div class="alert alert-info border-0">
-                                        <i class="bi bi-info-circle me-2"></i>
-                                        <strong>Last Modified:</strong> @Model.AppModifiedDateTime.Value.ToString("dd-MMM-yyyy hh:mm tt")
+                        <!-- ===================== TAB 1: APP DEFAULTS ===================== -->
+                        <div class="tab-pane fade" id="pane-defaults" role="tabpanel" aria-labelledby="tab-defaults">
+                            @using (Html.BeginForm("Save", "ApplicationOptions", FormMethod.Post, new { id = "appOptionsForm" }))
+                            {
+                                @Html.AntiForgeryToken()
+                                @Html.HiddenFor(m => m.AppId)
+
+                                <div class="row g-4">
+                                    <div class="col-md-6">
+                                        <div class="form-group">
+                                            <label for="AppDefaultLocation" class="form-label fw-semibold">
+                                                Default Location <span class="text-danger">*</span>
+                                            </label>
+                                            @Html.DropDownListFor(m => m.AppDefaultLocation,
+                                                (SelectList)ViewBag.Locations,
+                                                "-- Select Default Location --",
+                                                new { @class = "form-select", required = "required", id = "AppDefaultLocation" })
+                                            <small class="text-muted">This location will be used as default for transactions</small>
+                                        </div>
+                                    </div>
+
+                                    <div class="col-md-6">
+                                        <div class="form-group">
+                                            <label for="AppTranDocSeries" class="form-label fw-semibold">
+                                                Transaction Document Series <span class="text-danger">*</span>
+                                            </label>
+                                            @Html.TextBoxFor(m => m.AppTranDocSeries,
+                                                new { @class = "form-control",
+                                                      placeholder = "e.g., SA, STK",
+                                                      maxlength = "10",
+                                                      required = "required" })
+                                            <small class="text-muted">Document series prefix for transactions (max 10 characters)</small>
+                                        </div>
                                     </div>
                                 </div>
-                            </div>
-                        }
 
-                        <div class="row mt-4">
-                            <div class="col-12 text-center">
-                                <button type="submit" class="btn btn-primary btn-lg px-5" id="btnSave">
-                                    <i class="bi bi-save me-2"></i>Save Options
-                                </button>
+                                if (Model.AppModifiedDateTime != null)
+                                {
+                                    <div class="row mt-4">
+                                        <div class="col-12">
+                                            <div class="alert alert-info border-0">
+                                                <i class="bi bi-info-circle me-2"></i>
+                                                <strong>Last Modified:</strong> @Model.AppModifiedDateTime.Value.ToString("dd-MMM-yyyy hh:mm tt")
+                                            </div>
+                                        </div>
+                                    </div>
+                                }
+
+                                <div class="row mt-4">
+                                    <div class="col-12 text-center">
+                                        <button type="submit" class="btn btn-primary btn-lg px-5" id="btnSave">
+                                            <i class="bi bi-save me-2"></i>Save Options
+                                        </button>
+                                    </div>
+                                </div>
+                            }
+                        </div>
+
+                        <!-- ===================== TAB 2: APPROVAL AMOUNT THRESHOLD ===================== -->
+                        <div class="tab-pane fade" id="pane-thresholds" role="tabpanel" aria-labelledby="tab-thresholds">
+
+                            <div class="alert alert-secondary border-0 mb-4">
+                                <i class="bi bi-info-circle me-2"></i>
+                                Configure amount thresholds for each approval level. The <strong>Min Amount</strong> for L1 starts at 0.
+                                For subsequent levels, the Min Amount is automatically set to the previous level's Max Amount + 1.
+                            </div>
+
+                            <!-- Loading spinner for threshold data -->
+                            <div id="thresholdSpinner" class="text-center py-4" style="display:none;">
+                                <div class="spinner-border text-primary" role="status">
+                                    <span class="visually-hidden">Loading...</span>
+                                </div>
+                                <p class="mt-2 text-muted">Loading approval levels...</p>
+                            </div>
+
+                            <!-- Threshold Table -->
+                            <div class="table-responsive">
+                                <table class="table table-bordered table-hover align-middle" id="thresholdTable">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th style="width:12%;" class="text-center">Level</th>
+                                            <th style="width:28%;">Approver Name</th>
+                                            <th style="width:25%;">Min Amount</th>
+                                            <th style="width:25%;">Max Amount <span class="text-danger">*</span></th>
+                                            <th style="width:10%;" class="text-center">Action</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="thresholdTableBody">
+                                        <tr>
+                                            <td colspan="5" class="text-center text-muted">Loading approval levels...</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+
+                            <div class="row mt-4">
+                                <div class="col-12 text-center">
+                                    <button type="button" class="btn btn-primary btn-lg px-5" id="btnSaveThresholds">
+                                        <i class="bi bi-save me-2"></i>Save Thresholds
+                                    </button>
+                                </div>
                             </div>
                         </div>
-                    }
+                    </div>
+                    <!-- end tab-content -->
+
                 </div>
             </div>
         </div>
@@ -138,7 +248,82 @@
     <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
     <script>
         $(document).ready(function () {
-            // Initialize Select2 on Default Location dropdown
+
+            // ================ TAB 0: LAST RECORD NUMBERS ================
+
+            loadLastRecordNumbers();
+
+            function loadLastRecordNumbers() {
+                $('#lastRecSpinner').show();
+                $('#lastRecTable').hide();
+
+                $.ajax({
+                    url: '@Url.Action("GetLastRecordNumbers", "ApplicationOptions")',
+                    type: 'GET',
+                    success: function (response) {
+                        $('#lastRecSpinner').hide();
+                        if (response.success) {
+                            var tbody = $('#lastRecTableBody');
+                            tbody.empty();
+
+                            if (response.data.length === 0) {
+                                tbody.append('<tr><td colspan="5" class="text-center text-muted">No record types found.</td></tr>');
+                            } else {
+                                response.data.forEach(function (rec) {
+                                    var dateStr = '-';
+                                    var timeStr = '-';
+
+                                    if (rec.LastDate) {
+                                        var d = parseMsDate(rec.LastDate);
+                                        if (d) {
+                                            var day = ('0' + d.getDate()).slice(-2);
+                                            var months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+                                            dateStr = day + '-' + months[d.getMonth()] + '-' + d.getFullYear();
+                                        }
+                                    }
+
+                                    if (rec.LastTime) {
+                                        var t = parseMsDate(rec.LastTime);
+                                        if (t) {
+                                            var hours = t.getHours();
+                                            var mins = ('0' + t.getMinutes()).slice(-2);
+                                            var secs = ('0' + t.getSeconds()).slice(-2);
+                                            var ampm = hours >= 12 ? 'PM' : 'AM';
+                                            hours = hours % 12 || 12;
+                                            timeStr = ('0' + hours).slice(-2) + ':' + mins + ':' + secs + ' ' + ampm;
+                                        }
+                                    }
+
+                                    var recNumDisplay = rec.LastRecNumber > 0
+                                        ? '<span class="badge bg-primary fs-6">' + rec.LastRecNumber + '</span>'
+                                        : '<span class="text-muted">No records</span>';
+
+                                    var row = '<tr>' +
+                                        '<td class="text-center"><span class="badge bg-secondary">' + escapeHtml(rec.REC_Name) + '</span></td>' +
+                                        '<td>' + escapeHtml(rec.REC_Name2) + '</td>' +
+                                        '<td class="text-center">' + recNumDisplay + '</td>' +
+                                        '<td class="text-center">' + dateStr + '</td>' +
+                                        '<td class="text-center">' + timeStr + '</td>' +
+                                        '</tr>';
+
+                                    tbody.append(row);
+                                });
+                            }
+
+                            $('#lastRecTable').show();
+                        } else {
+                            showToast('error', response.message || 'Failed to load last record numbers');
+                        }
+                    },
+                    error: function () {
+                        $('#lastRecSpinner').hide();
+                        showToast('error', 'An error occurred while loading last record numbers');
+                    }
+                });
+            }
+
+            // ================ TAB 1: APP DEFAULTS ================
+
             $('#AppDefaultLocation').select2({
                 theme: 'bootstrap-5',
                 placeholder: '-- Select Default Location --',
@@ -148,7 +333,6 @@
 
             $('#appOptionsForm').on('submit', function (e) {
                 e.preventDefault();
-
                 var formData = $(this).serialize();
 
                 $.ajax({
@@ -165,9 +349,7 @@
 
                         if (response.success) {
                             showToast('success', response.message);
-                            setTimeout(function () {
-                                window.location.reload();
-                            }, 1500);
+                            setTimeout(function () { window.location.reload(); }, 1500);
                         } else {
                             showToast('error', response.message);
                         }
@@ -180,9 +362,242 @@
                 });
             });
 
+            // ================ TAB 2: APPROVAL AMOUNT THRESHOLD ================
+
+            var approvalLevels = [];    // from Login_Master
+            var thresholdData = [];     // rows displayed in the table
+            var savedThresholds = {};   // existing saved thresholds keyed by level
+            var thresholdTabLoaded = false;
+
+            // Load threshold data when tab is shown
+            $('button[data-bs-target="#pane-thresholds"]').on('shown.bs.tab', function () {
+                if (!thresholdTabLoaded) {
+                    loadThresholdData();
+                    thresholdTabLoaded = true;
+                }
+            });
+
+            function loadThresholdData() {
+                $('#thresholdSpinner').show();
+
+                // Load approval levels and existing thresholds in parallel
+                $.when(
+                    $.ajax({ url: '@Url.Action("GetApprovalLevels", "ApplicationOptions")', type: 'GET' }),
+                    $.ajax({ url: '@Url.Action("GetThresholds", "ApplicationOptions")', type: 'GET' })
+                ).done(function (levelsResp, thresholdsResp) {
+                    var levelsData = levelsResp[0];
+                    var thresholdsData = thresholdsResp[0];
+
+                    if (levelsData.success) {
+                        approvalLevels = levelsData.data;
+                    }
+
+                    // Build saved thresholds lookup by level
+                    savedThresholds = {};
+                    if (thresholdsData.success && thresholdsData.data) {
+                        thresholdsData.data.forEach(function (t) {
+                            savedThresholds[t.ThresholdLevel] = t;
+                        });
+                    }
+
+                    buildThresholdTable();
+                    $('#thresholdSpinner').hide();
+                }).fail(function () {
+                    $('#thresholdSpinner').hide();
+                    showToast('error', 'Failed to load approval level data');
+                });
+            }
+
+            function buildThresholdTable() {
+                thresholdData = [];
+                var tbody = $('#thresholdTableBody');
+                tbody.empty();
+
+                if (approvalLevels.length === 0) {
+                    tbody.append('<tr><td colspan="5" class="text-center text-muted">No approvers configured in Login Master.</td></tr>');
+                    return;
+                }
+
+                approvalLevels.forEach(function (approver, index) {
+                    var level = approver.ApprovalLevel;
+                    var name = approver.ApproverName;
+                    var saved = savedThresholds[level];
+
+                    var minAmount = 0;
+                    var maxAmount = saved ? saved.ThresholdMaxAmount : 0;
+
+                    if (index === 0) {
+                        // L1 always starts at 0
+                        minAmount = 0;
+                    } else {
+                        // Min = previous level max + 1
+                        var prevMax = thresholdData.length > 0 ? thresholdData[thresholdData.length - 1].maxAmount : 0;
+                        minAmount = prevMax > 0 ? prevMax + 1 : 0;
+                    }
+
+                    // If saved threshold exists, use its max; otherwise default to 0
+                    if (saved) {
+                        maxAmount = saved.ThresholdMaxAmount;
+                    }
+
+                    thresholdData.push({
+                        level: level,
+                        approverName: name,
+                        minAmount: minAmount,
+                        maxAmount: maxAmount
+                    });
+
+                    var isFirstLevel = (index === 0);
+                    var row = '<tr data-level="' + level + '" data-index="' + index + '">' +
+                        '<td class="text-center"><span class="badge bg-primary fs-6">L' + level + '</span></td>' +
+                        '<td><input type="text" class="form-control bg-light" value="' + escapeHtml(name) + '" readonly /></td>' +
+                        '<td><input type="number" class="form-control bg-light threshold-min" value="' + minAmount.toFixed(2) + '" readonly /></td>' +
+                        '<td><input type="number" class="form-control threshold-max" value="' + (maxAmount > 0 ? maxAmount.toFixed(2) : '') + '" ' +
+                        'placeholder="Enter max amount" step="0.01" min="' + (minAmount + 1) + '" required /></td>' +
+                        '<td class="text-center">' +
+                        '<button type="button" class="btn btn-sm btn-outline-danger btn-remove-threshold" data-index="' + index + '" title="Remove">' +
+                        '<i class="bi bi-trash"></i></button>' +
+                        '</td></tr>';
+
+                    tbody.append(row);
+                });
+            }
+
+            // When max amount changes on any row, recalculate min amounts for subsequent rows
+            $(document).on('change input', '.threshold-max', function () {
+                var $row = $(this).closest('tr');
+                var rowIndex = parseInt($row.data('index'));
+                var newMax = parseFloat($(this).val()) || 0;
+
+                // Update thresholdData
+                thresholdData[rowIndex].maxAmount = newMax;
+
+                // Recalculate min amounts for all subsequent rows
+                for (var i = rowIndex + 1; i < thresholdData.length; i++) {
+                    var prevMax = thresholdData[i - 1].maxAmount;
+                    var newMin = prevMax > 0 ? prevMax + 1 : 0;
+                    thresholdData[i].minAmount = newMin;
+
+                    var $nextRow = $('#thresholdTableBody tr[data-index="' + i + '"]');
+                    $nextRow.find('.threshold-min').val(newMin.toFixed(2));
+                    $nextRow.find('.threshold-max').attr('min', newMin + 1);
+                }
+            });
+
+            // Remove threshold row
+            $(document).on('click', '.btn-remove-threshold', function () {
+                var idx = parseInt($(this).data('index'));
+                if (confirm('Remove threshold for L' + thresholdData[idx].level + '?')) {
+                    thresholdData.splice(idx, 1);
+                    rebuildThresholdRows();
+                }
+            });
+
+            function rebuildThresholdRows() {
+                var tbody = $('#thresholdTableBody');
+                tbody.empty();
+
+                if (thresholdData.length === 0) {
+                    tbody.append('<tr><td colspan="5" class="text-center text-muted">No threshold rows. Add approval levels in Login Master.</td></tr>');
+                    return;
+                }
+
+                thresholdData.forEach(function (item, index) {
+                    if (index === 0) {
+                        item.minAmount = 0;
+                    } else {
+                        var prevMax = thresholdData[index - 1].maxAmount;
+                        item.minAmount = prevMax > 0 ? prevMax + 1 : 0;
+                    }
+
+                    var row = '<tr data-level="' + item.level + '" data-index="' + index + '">' +
+                        '<td class="text-center"><span class="badge bg-primary fs-6">L' + item.level + '</span></td>' +
+                        '<td><input type="text" class="form-control bg-light" value="' + escapeHtml(item.approverName) + '" readonly /></td>' +
+                        '<td><input type="number" class="form-control bg-light threshold-min" value="' + item.minAmount.toFixed(2) + '" readonly /></td>' +
+                        '<td><input type="number" class="form-control threshold-max" value="' + (item.maxAmount > 0 ? item.maxAmount.toFixed(2) : '') + '" ' +
+                        'placeholder="Enter max amount" step="0.01" min="' + (item.minAmount + 1) + '" required /></td>' +
+                        '<td class="text-center">' +
+                        '<button type="button" class="btn btn-sm btn-outline-danger btn-remove-threshold" data-index="' + index + '" title="Remove">' +
+                        '<i class="bi bi-trash"></i></button>' +
+                        '</td></tr>';
+
+                    tbody.append(row);
+                });
+            }
+
+            // Save Thresholds
+            $('#btnSaveThresholds').on('click', function () {
+                // Collect data from the table
+                var rows = [];
+                var valid = true;
+
+                $('#thresholdTableBody tr').each(function () {
+                    var $row = $(this);
+                    var level = parseInt($row.data('level'));
+                    if (isNaN(level)) return; // skip empty rows
+
+                    var minVal = parseFloat($row.find('.threshold-min').val()) || 0;
+                    var maxVal = parseFloat($row.find('.threshold-max').val());
+
+                    if (isNaN(maxVal) || maxVal <= 0) {
+                        showToast('error', 'Please enter a valid Max Amount for L' + level);
+                        valid = false;
+                        return false;
+                    }
+
+                    if (maxVal <= minVal) {
+                        showToast('error', 'Max Amount for L' + level + ' must be greater than Min Amount (' + minVal.toFixed(2) + ')');
+                        valid = false;
+                        return false;
+                    }
+
+                    rows.push({
+                        ThresholdLevel: level,
+                        ThresholdMinAmount: minVal,
+                        ThresholdMaxAmount: maxVal
+                    });
+                });
+
+                if (!valid) return;
+
+                if (rows.length === 0) {
+                    showToast('error', 'No threshold data to save');
+                    return;
+                }
+
+                $.ajax({
+                    url: '@Url.Action("SaveThresholds", "ApplicationOptions")',
+                    type: 'POST',
+                    data: { thresholdsJson: JSON.stringify(rows) },
+                    beforeSend: function () {
+                        $('#btnSaveThresholds').prop('disabled', true)
+                            .html('<i class="bi bi-hourglass-split me-2"></i>Saving...');
+                    },
+                    success: function (response) {
+                        $('#btnSaveThresholds').prop('disabled', false)
+                            .html('<i class="bi bi-save me-2"></i>Save Thresholds');
+
+                        if (response.success) {
+                            showToast('success', response.message);
+                            // Reload thresholds
+                            thresholdTabLoaded = false;
+                            loadThresholdData();
+                        } else {
+                            showToast('error', response.message);
+                        }
+                    },
+                    error: function () {
+                        $('#btnSaveThresholds').prop('disabled', false)
+                            .html('<i class="bi bi-save me-2"></i>Save Thresholds');
+                        showToast('error', 'An error occurred while saving thresholds');
+                    }
+                });
+            });
+
+            // ================ SHARED ================
+
             function showToast(type, message) {
                 var toastEl, toastMessage;
-
                 if (type === 'success') {
                     toastEl = document.getElementById('successToast');
                     toastMessage = document.getElementById('successToastMessage');
@@ -190,13 +605,27 @@
                     toastEl = document.getElementById('errorToast');
                     toastMessage = document.getElementById('errorToastMessage');
                 }
-
                 toastMessage.textContent = message;
-
                 var toast = new bootstrap.Toast(toastEl, {
                     delay: type === 'success' ? 3000 : 5000
                 });
                 toast.show();
+            }
+
+            function escapeHtml(text) {
+                if (!text) return '';
+                var div = document.createElement('div');
+                div.appendChild(document.createTextNode(text));
+                return div.innerHTML;
+            }
+
+            // Parse .NET Framework /Date(ticks)/ format
+            function parseMsDate(val) {
+                if (!val) return null;
+                var match = /\/Date\((-?\d+)\)\//.exec(val);
+                if (match) return new Date(parseInt(match[1], 10));
+                var d = new Date(val);
+                return isNaN(d.getTime()) ? null : d;
             }
         });
     </script>

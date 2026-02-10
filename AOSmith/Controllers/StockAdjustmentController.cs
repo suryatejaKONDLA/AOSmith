@@ -822,6 +822,7 @@ namespace AOSmith.Controllers
             table.Columns.Add("StockToLocation", typeof(string));
             table.Columns.Add("StockItemCode", typeof(string));
             table.Columns.Add("StockQty", typeof(decimal));
+            table.Columns.Add("StockCost", typeof(decimal));
 
             foreach (var item in lineItems)
             {
@@ -830,7 +831,8 @@ namespace AOSmith.Controllers
                     item.FromLocation?.Trim() ?? string.Empty,
                     item.ToLocation?.Trim() ?? string.Empty,
                     item.ItemCode?.Trim() ?? string.Empty,
-                    item.Qty
+                    item.Qty,
+                    item.Cost
                 );
             }
 

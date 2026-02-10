@@ -548,6 +548,7 @@
 
         if (gridData.length === 0) {
             tbody.append('<tr id="noDataRow"><td colspan="8" class="text-center text-muted">No items added yet. Click "Add Item" to begin.</td></tr>');
+            updateRateSummary();
             return;
         }
 
@@ -570,6 +571,31 @@
                 '</td></tr>';
             tbody.append(row);
         });
+
+        updateRateSummary();
+    }
+
+    // Update Stock Increase Rate and Stock Decrease Rate summary
+    function updateRateSummary()
+    {
+        var increaseTotal = 0;
+        var decreaseTotal = 0;
+
+        gridData.forEach(function (item)
+        {
+            var cost = item.cost ? parseFloat(item.cost) : 0;
+            var qty = item.qty ? parseFloat(item.qty) : 0;
+            var amount = cost * qty;
+
+            if (item.recType === 12) {
+                increaseTotal += amount;
+            } else if (item.recType === 10) {
+                decreaseTotal += amount;
+            }
+        });
+
+        $('#stockIncreaseRate').val(increaseTotal.toFixed(4));
+        $('#stockDecreaseRate').val(decreaseTotal.toFixed(4));
     }
 
     // Edit item
@@ -603,7 +629,8 @@
                 toLocation: item.toLocation,
                 itemCode: item.itemCode,
                 itemDescription: item.itemDescription,
-                qty: item.qty
+                qty: item.qty,
+                cost: item.cost ? parseFloat(item.cost) : 0
             };
         })));
 
