@@ -117,8 +117,7 @@
     </div>
 </div>
 
-<!-- Sage API Response Modal -->
-<div class="modal fade" id="sageResponseModal" tabindex="-1" aria-labelledby="sageResponseModalLabel" aria-hidden="true">
+<!-- Sage API Response Modal (dynamically populated) -->
 
 <!-- Global Loading Spinner Overlay -->
 <div id="globalSpinner" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(255,255,255,0.7); z-index:99999; justify-content:center; align-items:center;">
@@ -129,48 +128,6 @@
         <p class="mt-2 fw-semibold text-primary" id="spinnerMessage">Loading...</p>
     </div>
 </div>
-    <div class="modal-dialog modal-lg modal-dialog-scrollable">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title" id="sageResponseModalLabel">
-                    <i class="bi bi-cloud-check me-2"></i>Sage API - Result
-                </h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body">
-                <div id="sageStatusBadge" class="mb-3"></div>
-                <div id="sageMessage" class="mb-3"></div>
-
-                <div class="mb-3">
-                    <button class="btn btn-sm btn-outline-primary" type="button" data-bs-toggle="collapse" data-bs-target="#sageRequestCollapse">
-                        <i class="bi bi-send me-1"></i> View Request Sent
-                    </button>
-                    <button class="btn btn-sm btn-outline-secondary ms-2" type="button" data-bs-toggle="collapse" data-bs-target="#sageResponseCollapse">
-                        <i class="bi bi-reply me-1"></i> View Response Received
-                    </button>
-                </div>
-
-                <div class="collapse mb-3" id="sageRequestCollapse">
-                    <div class="card card-body">
-                        <h6 class="text-primary">Request JSON:</h6>
-                        <pre id="sageRequestJson" class="bg-dark text-light p-3 rounded" style="max-height:300px; overflow:auto; font-size: 0.8rem;"></pre>
-                    </div>
-                </div>
-
-                <div class="collapse mb-3" id="sageResponseCollapse">
-                    <div class="card card-body">
-                        <h6 class="text-success">Response JSON:</h6>
-                        <pre id="sageResponseJson" class="bg-dark text-light p-3 rounded" style="max-height:300px; overflow:auto; font-size: 0.8rem;"></pre>
-                    </div>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-            </div>
-        </div>
-    </div>
-</div>
-
 @section Scripts {
     <script>
         var currentUserLevel = 0;
@@ -490,11 +447,12 @@
                         } else if (response.sageTransferResponse) {
                             showSageResponseModal(response.sageTransferResponse, response.message);
                         } else {
-                            alert(response.message);
+                            showResultAlert(response.message, true);
+                            loadPendingApprovals();
                         }
-                        loadPendingApprovals();
                     } else {
-                        alert('Error: ' + response.message);
+                        showResultAlert(response.message, false);
+                        loadPendingApprovals();
                     }
                 },
                 error: function (xhr, status, error) {
@@ -507,49 +465,91 @@
         }
 
         function showSageResponseModal(sageData, message) {
-            // Status badge
-            var isSuccess = sageData.status && sageData.status.toLowerCase() !== 'error';
-            var badgeClass = isSuccess ? 'bg-success' : 'bg-danger';
-            var badgeIcon = isSuccess ? 'bi-check-circle-fill' : 'bi-x-circle-fill';
-            $('#sageStatusBadge').html(
-                '<span class="badge ' + badgeClass + ' fs-6"><i class="bi ' + badgeIcon + ' me-1"></i>' +
-                (sageData.status || 'Unknown') + '</span>'
-            );
+            var isSuccess = sageData.isSuccess === true;
+            var statusClass = isSuccess ? 'success' : 'danger';
+            var statusIcon = isSuccess ? 'bi-check-circle-fill' : 'bi-x-circle-fill';
+            var alertClass = isSuccess ? 'alert-success' : 'alert-danger';
+            var alertIcon = isSuccess ? 'bi-database-check' : 'bi-exclamation-triangle-fill';
 
-            // Message
-            var msgHtml = '<div class="alert ' + (isSuccess ? 'alert-success' : 'alert-danger') + '">' +
-                '<strong>' + message + '</strong>';
-            if (sageData.message) {
-                msgHtml += '<br/><small>' + sageData.message + '</small>';
-            }
+            var docInfo = sageData.docNum || sageData.transferNumber || '';
+            var cardTitle = docInfo ? docInfo : (isSuccess ? 'Success' : 'Error');
+
+            var cardHtml = '<div class="card mb-3 border-' + statusClass + ' border-2">' +
+                '<div class="card-header bg-' + statusClass + ' bg-opacity-10 d-flex justify-content-between align-items-center">' +
+                '<span><i class="bi ' + statusIcon + ' text-' + statusClass + ' me-2"></i><strong>' + escapeHtml(cardTitle) + '</strong></span>' +
+                '<span class="badge bg-' + statusClass + '">' + escapeHtml(String(sageData.status || 'Unknown')) + '</span></div>' +
+                '<div class="card-body"><p class="mb-2"><strong>Message:</strong> ' + escapeHtml(sageData.message || 'No message') + '</p>';
+
             if (sageData.docNum) {
-                msgHtml += '<br/><small>Doc #: ' + sageData.docNum + '</small>';
+                cardHtml += '<p class="mb-2"><strong>Doc #:</strong> ' + escapeHtml(sageData.docNum) + '</p>';
             }
             if (sageData.transferNumber) {
-                msgHtml += '<br/><small>Transfer #: ' + sageData.transferNumber + '</small>';
+                cardHtml += '<p class="mb-2"><strong>Transfer #:</strong> ' + escapeHtml(sageData.transferNumber) + '</p>';
             }
-            msgHtml += '</div>';
-            $('#sageMessage').html(msgHtml);
 
-            // Request/Response JSON
+            cardHtml += '<div class="mt-2">' +
+                '<button class="btn btn-sm btn-outline-primary me-2" type="button" data-bs-toggle="collapse" data-bs-target="#sageReq0"><i class="bi bi-arrow-up-circle me-1"></i>View Request</button>' +
+                '<button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#sageRes0"><i class="bi bi-arrow-down-circle me-1"></i>View Response</button>' +
+                '<div class="collapse mt-2" id="sageReq0"><pre class="bg-dark text-light p-3 rounded" style="max-height:300px;overflow-y:auto;font-size:0.85rem;white-space:pre-wrap;">' + escapeHtml(formatJson(sageData.rawRequest) || 'No request data') + '</pre></div>' +
+                '<div class="collapse mt-2" id="sageRes0"><pre class="bg-dark text-light p-3 rounded" style="max-height:300px;overflow-y:auto;font-size:0.85rem;white-space:pre-wrap;">' + escapeHtml(formatJson(sageData.rawResponse) || 'No response data') + '</pre></div>' +
+                '</div></div></div>';
+
+            var modalHtml = '<div class="modal fade" id="sageResponseModal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false">' +
+                '<div class="modal-dialog modal-lg"><div class="modal-content">' +
+                '<div class="modal-header bg-info text-white"><h5 class="modal-title"><i class="bi bi-cloud-arrow-up me-2"></i>Transaction Results</h5></div>' +
+                '<div class="modal-body p-4">' +
+                '<div class="alert ' + alertClass + ' mb-4"><i class="bi ' + alertIcon + ' me-2"></i>' + escapeHtml(message) + '</div>' +
+                '<h6 class="fw-bold mb-3">Results</h6>' + cardHtml +
+                '</div><div class="modal-footer"><button type="button" class="btn btn-primary" id="btnCloseSageModal"><i class="bi bi-check-lg me-2"></i>OK</button></div>' +
+                '</div></div></div>';
+
+            $('#sageResponseModal').remove();
+            $('body').append(modalHtml);
+
+            var sageModal = new bootstrap.Modal(document.getElementById('sageResponseModal'));
+            sageModal.show();
+
+            $('#btnCloseSageModal').on('click', function () {
+                sageModal.hide();
+                loadPendingApprovals();
+            });
+        }
+
+        function formatJson(str) {
+            if (!str) return '';
             try {
-                var reqObj = JSON.parse(sageData.rawRequest);
-                $('#sageRequestJson').text(JSON.stringify(reqObj, null, 2));
+                return JSON.stringify(JSON.parse(str), null, 2);
             } catch (e) {
-                $('#sageRequestJson').text(sageData.rawRequest || 'N/A');
+                return str;
             }
-            try {
-                var resObj = JSON.parse(sageData.rawResponse);
-                $('#sageResponseJson').text(JSON.stringify(resObj, null, 2));
-            } catch (e) {
-                $('#sageResponseJson').text(sageData.rawResponse || 'N/A');
-            }
+        }
 
-            // Collapse both sections by default
-            $('#sageRequestCollapse').removeClass('show');
-            $('#sageResponseCollapse').removeClass('show');
+        function escapeHtml(text) {
+            if (!text) return '';
+            var div = document.createElement('div');
+            div.appendChild(document.createTextNode(text));
+            return div.innerHTML;
+        }
 
-            $('#sageResponseModal').modal('show');
+        function showResultAlert(message, isSuccess) {
+            var statusClass = isSuccess ? 'success' : 'danger';
+            var statusIcon = isSuccess ? 'bi-check-circle-fill' : 'bi-x-circle-fill';
+            var alertClass = isSuccess ? 'alert-success' : 'alert-danger';
+
+            var modalHtml = '<div class="modal fade" id="resultAlertModal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false">' +
+                '<div class="modal-dialog"><div class="modal-content">' +
+                '<div class="modal-header bg-' + statusClass + ' bg-opacity-10 border-0">' +
+                '<h5 class="modal-title text-' + statusClass + '"><i class="bi ' + statusIcon + ' me-2"></i>' + (isSuccess ? 'Success' : 'Error') + '</h5></div>' +
+                '<div class="modal-body p-4">' +
+                '<div class="alert ' + alertClass + ' mb-0"><i class="bi ' + statusIcon + ' me-2"></i>' + escapeHtml(message) + '</div>' +
+                '</div><div class="modal-footer border-0"><button type="button" class="btn btn-primary" data-bs-dismiss="modal"><i class="bi bi-check-lg me-2"></i>OK</button></div>' +
+                '</div></div></div>';
+
+            $('#resultAlertModal').remove();
+            $('body').append(modalHtml);
+
+            var alertModal = new bootstrap.Modal(document.getElementById('resultAlertModal'));
+            alertModal.show();
         }
 
         function formatDate(dateString) {

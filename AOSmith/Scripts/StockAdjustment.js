@@ -710,31 +710,42 @@
     // Show Sage API response in a modal
     function showSageResponseModal(dbMessage, sageResults)
     {
+        var hasErrors = false;
         var sageHtml = '';
-        sageResults.forEach(function (sage, index) {
-            var statusClass = (sage.sageStatus || '').toLowerCase() === 'error' ? 'danger' : 'success';
-            var statusIcon = statusClass === 'success' ? 'bi-check-circle-fill' : 'bi-x-circle-fill';
+        sageResults.forEach(function (sage, index)
+        {
+            var isSuccess = sage.isSuccess === true;
+            var statusClass = isSuccess ? 'success' : 'danger';
+            var statusIcon = isSuccess ? 'bi-check-circle-fill' : 'bi-x-circle-fill';
             var docRef = sage.documentReference || ('RecType ' + sage.recType + ' | RecNumber ' + sage.recNumber);
 
-            sageHtml += '<div class="card mb-3 border-' + statusClass + '">' +
+            if (!isSuccess) hasErrors = true;
+
+            sageHtml += '<div class="card mb-3 border-' + statusClass + ' border-2">' +
                 '<div class="card-header bg-' + statusClass + ' bg-opacity-10 d-flex justify-content-between align-items-center">' +
                 '<span><i class="bi ' + statusIcon + ' text-' + statusClass + ' me-2"></i><strong>' + escapeHtml(docRef) + '</strong></span>' +
-                '<span class="badge bg-' + statusClass + '">' + escapeHtml(sage.sageStatus || 'Unknown') + '</span></div>' +
-                '<div class="card-body"><p class="mb-2"><strong>Message:</strong> ' + escapeHtml(sage.sageMessage || 'No message') + '</p>' +
-                '<div class="mt-2">' +
+                '<span class="badge bg-' + statusClass + '">' + escapeHtml(String(sage.sageStatus || 'Unknown')) + '</span></div>' +
+                '<div class="card-body"><p class="mb-2"><strong>Message:</strong> ' + escapeHtml(sage.sageMessage || 'No message') + '</p>';
+
+            sageHtml += '<div class="mt-2">' +
                 '<button class="btn btn-sm btn-outline-primary me-2" type="button" data-bs-toggle="collapse" data-bs-target="#sageReq' + index + '"><i class="bi bi-arrow-up-circle me-1"></i>View Request</button>' +
                 '<button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#sageRes' + index + '"><i class="bi bi-arrow-down-circle me-1"></i>View Response</button>' +
-                '<div class="collapse mt-2" id="sageReq' + index + '"><pre class="bg-dark text-light p-3 rounded" style="max-height:300px;overflow-y:auto;font-size:0.85rem;white-space:pre-wrap;">' + escapeHtml(formatJson(sage.sageRawRequest)) + '</pre></div>' +
-                '<div class="collapse mt-2" id="sageRes' + index + '"><pre class="bg-dark text-light p-3 rounded" style="max-height:300px;overflow-y:auto;font-size:0.85rem;white-space:pre-wrap;">' + escapeHtml(formatJson(sage.sageRawResponse)) + '</pre></div>' +
-                '</div></div></div>';
+                '<div class="collapse mt-2" id="sageReq' + index + '"><pre class="bg-dark text-light p-3 rounded" style="max-height:300px;overflow-y:auto;font-size:0.85rem;white-space:pre-wrap;">' + escapeHtml(formatJson(sage.sageRawRequest) || 'No request data') + '</pre></div>' +
+                '<div class="collapse mt-2" id="sageRes' + index + '"><pre class="bg-dark text-light p-3 rounded" style="max-height:300px;overflow-y:auto;font-size:0.85rem;white-space:pre-wrap;">' + escapeHtml(formatJson(sage.sageRawResponse) || 'No response data') + '</pre></div>' +
+                '</div>';
+
+            sageHtml += '</div></div>';
         });
+
+        var alertClass = hasErrors ? 'alert-danger' : 'alert-success';
+        var alertIcon = hasErrors ? 'bi-exclamation-triangle-fill' : 'bi-database-check';
 
         var modalHtml = '<div class="modal fade" id="sageResponseModal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false">' +
             '<div class="modal-dialog modal-lg"><div class="modal-content">' +
-            '<div class="modal-header bg-info text-white"><h5 class="modal-title"><i class="bi bi-cloud-arrow-up me-2"></i>Sage300 API Response</h5></div>' +
+            '<div class="modal-header bg-info text-white"><h5 class="modal-title"><i class="bi bi-cloud-arrow-up me-2"></i>Transaction Results</h5></div>' +
             '<div class="modal-body p-4">' +
-            '<div class="alert alert-success mb-4"><i class="bi bi-database-check me-2"></i><strong>Database:</strong> ' + escapeHtml(dbMessage) + '</div>' +
-            '<h6 class="fw-bold mb-3">Sage300 Transfer Entry Results</h6>' + sageHtml +
+            '<div class="alert ' + alertClass + ' mb-4"><i class="bi ' + alertIcon + ' me-2"></i>' + escapeHtml(dbMessage) + '</div>' +
+            '<h6 class="fw-bold mb-3">Results (' + sageResults.length + ')</h6>' + sageHtml +
             '</div><div class="modal-footer"><button type="button" class="btn btn-primary" id="btnCloseSageModal"><i class="bi bi-check-lg me-2"></i>OK</button></div>' +
             '</div></div></div>';
 

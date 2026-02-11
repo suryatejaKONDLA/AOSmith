@@ -13,5 +13,6 @@ namespace AOSmith.Models
         public int LastRecNumber { get; set; }
         public DateTime? LastDate { get; set; }
         public DateTime? LastTime { get; set; }
+        public string SageTransactionNumber { get; set; }
     }
 }

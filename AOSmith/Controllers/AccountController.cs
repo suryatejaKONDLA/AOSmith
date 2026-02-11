@@ -1,3 +1,5 @@
+using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
 using System.Web.Mvc;
 using AOSmith.Helpers;
@@ -10,9 +12,10 @@ namespace AOSmith.Controllers
     public class AccountController : Controller
     {
         private readonly AuthService _authService = new AuthService();
+        private readonly IDatabaseHelper _dbHelper = new DatabaseHelper();
 
         // GET: Account/Login
-        public ActionResult Login()
+        public async Task<ActionResult> Login()
         {
             // Redirect to home if already logged in
             if (SessionHelper.IsUserLoggedIn())
@@ -20,8 +23,35 @@ namespace AOSmith.Controllers
                 return RedirectToAction("Index", "Home");
             }
 
+            // Load active companies for dropdown
+            await LoadCompaniesDropdown();
+
             // TempData will automatically be available in the view
             return View();
+        }
+
+        private async Task LoadCompaniesDropdown()
+        {
+            try
+            {
+                const string sql = @"SELECT Company_Name, Company_Location
+                                    FROM Company_Master
+                                    WHERE Company_Active_Flag = 1
+                                    ORDER BY Company_Name";
+
+                var companies = await _dbHelper.QueryAsync<dynamic>(sql);
+                var companyList = companies.Select(c => new
+                {
+                    Value = c.Company_Name,
+                    Text = $"{c.Company_Name} ({c.Company_Location})"
+                }).ToList();
+
+                ViewBag.Companies = new SelectList(companyList, "Value", "Text");
+            }
+            catch
+            {
+                ViewBag.Companies = new SelectList(new List<SelectListItem>(), "Value", "Text");
+            }
         }
 
         // POST: Account/Login
@@ -43,6 +73,9 @@ namespace AOSmith.Controllers
 
                 if (result.IsSuccess && result.UserSession != null)
                 {
+                    // Store company name in session
+                    result.UserSession.CompanyName = model.CompanyName;
+
                     // Set Session using SessionHelper
                     SessionHelper.SetUserSession(result.UserSession);
 

@@ -133,8 +133,9 @@ namespace AOSmith.Services
             try
             {
                 var sageService = new SageApiService();
-                var itemsTask = sageService.GetItemsAsync();
-                var locationsTask = sageService.GetLocationsAsync();
+                var companyName = Helpers.SessionHelper.GetCompanyName();
+                var itemsTask = sageService.GetItemsAsync(companyName);
+                var locationsTask = sageService.GetLocationsAsync(companyName);
                 await Task.WhenAll(itemsTask, locationsTask);
 
                 var itemsResponse = await itemsTask;

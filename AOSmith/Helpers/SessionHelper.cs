@@ -12,6 +12,7 @@ namespace AOSmith.Helpers
         private const string EmailKey = "Email";
         private const string IsApproverKey = "IsApprover";
         private const string ApprovalLevelKey = "ApprovalLevel";
+        private const string CompanyNameKey = "CompanyName";
 
         public static void SetUserSession(UserSession userSession)
         {
@@ -22,6 +23,7 @@ namespace AOSmith.Helpers
             HttpContext.Current.Session[EmailKey] = userSession.Email;
             HttpContext.Current.Session[IsApproverKey] = userSession.IsApprover;
             HttpContext.Current.Session[ApprovalLevelKey] = userSession.ApprovalLevel;
+            HttpContext.Current.Session[CompanyNameKey] = userSession.CompanyName;
         }
 
         public static UserSession GetUserSession()
@@ -37,7 +39,8 @@ namespace AOSmith.Helpers
                 Role = HttpContext.Current.Session[RoleKey]?.ToString(),
                 Email = HttpContext.Current.Session[EmailKey]?.ToString(),
                 IsApprover = HttpContext.Current.Session[IsApproverKey] as bool? ?? false,
-                ApprovalLevel = HttpContext.Current.Session[ApprovalLevelKey] as int? ?? 0
+                ApprovalLevel = HttpContext.Current.Session[ApprovalLevelKey] as int? ?? 0,
+                CompanyName = HttpContext.Current.Session[CompanyNameKey]?.ToString()
             };
         }
 
@@ -74,6 +77,11 @@ namespace AOSmith.Helpers
         public static int GetApprovalLevel()
         {
             return HttpContext.Current.Session[ApprovalLevelKey] as int? ?? 0;
+        }
+
+        public static string GetCompanyName()
+        {
+            return HttpContext.Current.Session[CompanyNameKey]?.ToString();
         }
 
         public static void ClearSession()

@@ -7,6 +7,10 @@ namespace AOSmith.Models
     /// </summary>
     public class LoginRequest
     {
+        [Required(ErrorMessage = "Company is required")]
+        [Display(Name = "Company")]
+        public string CompanyName { get; set; }
+
         [Required(ErrorMessage = "Username is required")]
         [Display(Name = "Username")]
         public string Username { get; set; }

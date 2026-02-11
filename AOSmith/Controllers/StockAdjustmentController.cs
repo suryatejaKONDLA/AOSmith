@@ -62,7 +62,8 @@ namespace AOSmith.Controllers
         {
             try
             {
-                var response = await _sageService.GetItemsAsync();
+                var companyName = SessionHelper.GetCompanyName();
+                var response = await _sageService.GetItemsAsync(companyName);
                 if (response?.icitems != null)
                 {
                     var item = response.icitems.FirstOrDefault(i =>
@@ -90,7 +91,8 @@ namespace AOSmith.Controllers
         {
             try
             {
-                var response = await _sageService.GetItemsAsync();
+                var companyName = SessionHelper.GetCompanyName();
+                var response = await _sageService.GetItemsAsync(companyName);
                 if (response?.icitems == null || !response.icitems.Any())
                 {
                     var errorMsg = response?.Errors != null && response.Errors.Any()
@@ -132,7 +134,8 @@ namespace AOSmith.Controllers
         {
             try
             {
-                var response = await _sageService.GetLocationsAsync();
+                var companyName = SessionHelper.GetCompanyName();
+                var response = await _sageService.GetLocationsAsync(companyName);
                 if (response?.locations == null)
                 {
                     return Json(new { success = false, message = "Failed to load locations from Sage API" }, JsonRequestBehavior.AllowGet);
@@ -175,7 +178,8 @@ namespace AOSmith.Controllers
                     return Json(new { success = false, message = "Item code is required" });
                 }
 
-                var response = await _sageService.SearchItemAsync(itemCode.Trim());
+                var companyName = SessionHelper.GetCompanyName();
+                var response = await _sageService.SearchItemAsync(companyName, itemCode.Trim());
                 if (response?.icitems != null && response.icitems.Any())
                 {
                     var item = response.icitems.FirstOrDefault();
@@ -207,11 +211,12 @@ namespace AOSmith.Controllers
                 var recTypeList = recTypes.ToList();
 
                 // Fetch Items from Sage API
-                var itemsResponse = await _sageService.GetItemsAsync();
+                var companyName = SessionHelper.GetCompanyName();
+                var itemsResponse = await _sageService.GetItemsAsync(companyName);
                 var sageItems = itemsResponse?.icitems?.Where(i => !i.inactive).ToList() ?? new List<SageItem>();
 
                 // Fetch Locations from Sage API
-                var locationsResponse = await _sageService.GetLocationsAsync();
+                var locationsResponse = await _sageService.GetLocationsAsync(companyName);
                 var sageLocations = locationsResponse?.locations?.ToList() ?? new List<SageLocation>();
 
                 using (var package = new ExcelPackage())
@@ -352,10 +357,11 @@ namespace AOSmith.Controllers
                 var recTypes = (await _dbHelper.QueryAsync<RecTypeMaster>(
                     "SELECT * FROM REC_Type_Master WHERE REC_Type IN (10, 12) ORDER BY REC_Order")).ToList();
 
-                var itemsResponse = await _sageService.GetItemsAsync();
+                var companyName = SessionHelper.GetCompanyName();
+                var itemsResponse = await _sageService.GetItemsAsync(companyName);
                 var sageItems = itemsResponse?.icitems?.Where(i => !i.inactive).ToList() ?? new List<SageItem>();
 
-                var locationsResponse = await _sageService.GetLocationsAsync();
+                var locationsResponse = await _sageService.GetLocationsAsync(companyName);
                 var sageLocations = locationsResponse?.locations?.ToList() ?? new List<SageLocation>();
 
                 // Get default location from App Options (for Stock Decrease To Location)
@@ -622,8 +628,9 @@ namespace AOSmith.Controllers
                     return Json(new { success = false, message = "No line items provided." });
                 }
 
-                // Get Session User ID
+                // Get Session User ID and Company
                 var sessionId = SessionHelper.GetUserId() ?? 1;
+                var companyName = SessionHelper.GetCompanyName();
 
                 // Group line items by RecType (since database structure requires separate transactions per RecType)
                 var groupedByRecType = lineItems.GroupBy(x => x.RecType);
@@ -666,6 +673,10 @@ namespace AOSmith.Controllers
                         new System.Data.SqlClient.SqlParameter("@StockDate", System.Data.SqlDbType.Date)
                         {
                             Value = transactionDate
+                        },
+                        new System.Data.SqlClient.SqlParameter("@StockCompanyName", System.Data.SqlDbType.VarChar, 10)
+                        {
+                            Value = companyName ?? ""
                         },
                         new System.Data.SqlClient.SqlParameter("@StockDetails", System.Data.SqlDbType.Structured)
                         {
@@ -713,21 +724,92 @@ namespace AOSmith.Controllers
                         // RecType 10 (Stock Decrease) → send to Sage Transfer Entry immediately
                         if (recType == 10)
                         {
+                            var finYear = ExtractFinYear(result.ResultMessage);
                             var sageResponse = await _sageService.SendTransferEntryAsync(
-                                items, transactionDate, recNumber, recType);
+                                companyName, finYear, items, transactionDate, recNumber, recType);
+
+                            if (!sageResponse.IsSuccess)
+                            {
+                                // Sage failed → rollback DB records
+                                var rollbackQuery = @"
+                                    DELETE FROM Stock_Adjustment_Files
+                                    WHERE File_Company_Name = @CompanyName AND File_FIN_Year = @FinYear
+                                    AND File_REC_Type = @RecType AND File_REC_Number = @RecNumber;
+
+                                    DELETE FROM Stock_Adjustment_Approval
+                                    WHERE Approval_Company_Name = @CompanyName AND Approval_FIN_Year = @FinYear
+                                    AND Approval_REC_Type = @RecType AND Approval_REC_Number = @RecNumber;
+
+                                    DELETE FROM Stock_Adjustment
+                                    WHERE Stock_Company_Name = @CompanyName AND Stock_FIN_Year = @FinYear
+                                    AND Stock_REC_Type = @RecType AND Stock_REC_Number = @RecNumber;";
+
+                                var rollbackParams = new Dictionary<string, object>
+                                {
+                                    { "@CompanyName", companyName },
+                                    { "@FinYear", finYear },
+                                    { "@RecType", recType },
+                                    { "@RecNumber", recNumber }
+                                };
+                                await _dbHelper.ExecuteNonQueryAsync(rollbackQuery, rollbackParams);
+
+                                // Remove from success, add to error
+                                successMessages.RemoveAt(successMessages.Count - 1);
+                                var sageErrors = sageResponse.Errors != null && sageResponse.Errors.Count > 0
+                                    ? string.Join("; ", sageResponse.Errors)
+                                    : sageResponse.Message ?? "Unknown Sage error";
+                                errorMessages.Add($"Sage API error for {documentReference}: {sageErrors}");
+                            }
+                            else
+                            {
+                                // Sage succeeded → mark as sent and save DocNum
+                                var sageSentQuery = @"
+                                    UPDATE Stock_Adjustment
+                                    SET Stock_Sage_Data_Sent = 1,
+                                        Stock_Sage_Sent_Date = GETDATE(),
+                                        Stock_Sage_Transaction_Number = @DocNum
+                                    WHERE Stock_Company_Name = @CompanyName AND Stock_FIN_Year = @FinYear
+                                    AND Stock_REC_Type = @RecType AND Stock_REC_Number = @RecNumber";
+
+                                var sageSentParams = new Dictionary<string, object>
+                                {
+                                    { "@DocNum", sageResponse.DocNum ?? "" },
+                                    { "@CompanyName", companyName },
+                                    { "@FinYear", finYear },
+                                    { "@RecType", recType },
+                                    { "@RecNumber", recNumber }
+                                };
+                                await _dbHelper.ExecuteNonQueryAsync(sageSentQuery, sageSentParams);
+                            }
 
                             sageResponses.Add(new
                             {
                                 recType,
                                 recNumber,
                                 documentReference,
-                                sageStatus = sageResponse.Status,
+                                sageStatus = sageResponse.IsSuccess ? "Success" : "Error",
                                 sageMessage = sageResponse.Message,
+                                isSuccess = sageResponse.IsSuccess,
                                 sageRawResponse = sageResponse.RawResponse,
                                 sageRawRequest = sageResponse.RawRequest
                             });
                         }
+
                         // RecType 12 (Stock Increase) → DB only, Sage called after approval
+                        if (recType == 12)
+                        {
+                            sageResponses.Add(new
+                            {
+                                recType,
+                                recNumber,
+                                documentReference,
+                                sageStatus = "Saved",
+                                sageMessage = "Saved to database successfully. Sage API will be called after full approval.",
+                                isSuccess = true,
+                                sageRawResponse = (string)null,
+                                sageRawRequest = (string)null
+                            });
+                        }
                     }
                     else
                     {
@@ -779,11 +861,11 @@ namespace AOSmith.Controllers
         {
             if (string.IsNullOrEmpty(resultMessage)) return 0;
 
-            // Try to extract Document Reference format: 202526/STDL/1 or 202526/STIN/1
-            var docRefMatch = System.Text.RegularExpressions.Regex.Match(resultMessage, @"(\d{6})/([A-Z]+)/(\d+)",
+            // Document Reference format: SMDAT/202526/TRN/1 or SMDAT/202526/ADJ/1
+            var docRefMatch = System.Text.RegularExpressions.Regex.Match(resultMessage, @"\d{6}/[A-Z]+/[A-Z]+/(\d+)",
                 System.Text.RegularExpressions.RegexOptions.IgnoreCase);
 
-            if (docRefMatch.Success && int.TryParse(docRefMatch.Groups[3].Value, out var recNum))
+            if (docRefMatch.Success && int.TryParse(docRefMatch.Groups[1].Value, out var recNum))
             {
                 return recNum;
             }
@@ -798,12 +880,25 @@ namespace AOSmith.Controllers
             return 0;
         }
 
+        private int ExtractFinYear(string resultMessage)
+        {
+            if (string.IsNullOrEmpty(resultMessage)) return 0;
+
+            var match = System.Text.RegularExpressions.Regex.Match(resultMessage, @"(\d{6})/[A-Z]+/[A-Z]+/\d+",
+                System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+
+            if (match.Success && int.TryParse(match.Groups[1].Value, out var finYear))
+                return finYear;
+
+            return 0;
+        }
+
         private string ExtractDocumentReference(string resultMessage)
         {
             if (string.IsNullOrEmpty(resultMessage)) return "";
 
-            // Extract Document Reference format: 202526/STDL/1 or 202526/STIN/1
-            var docRefMatch = System.Text.RegularExpressions.Regex.Match(resultMessage, @"(\d{6}/[A-Z]+/\d+)",
+            // Document Reference format: SMDAT/202526/TRN/1
+            var docRefMatch = System.Text.RegularExpressions.Regex.Match(resultMessage, @"(\d{6}/[A-Z]+/[A-Z]+/\d+)",
                 System.Text.RegularExpressions.RegexOptions.IgnoreCase);
 
             if (docRefMatch.Success)

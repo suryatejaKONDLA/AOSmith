@@ -37,5 +37,6 @@ namespace AOSmith.Models
         public string Department { get; set; }
         public bool IsApprover { get; set; }
         public int ApprovalLevel { get; set; }
+        public string CompanyName { get; set; }
     }
 }
