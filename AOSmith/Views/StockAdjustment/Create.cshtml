@@ -36,7 +36,7 @@
                     <div class="row mb-3">
                         <div class="col-12 d-flex gap-2">
                             <button type="button" class="btn btn-success" id="btnAddItem">
-                                <i class="bi bi-plus-circle me-1"></i> Add Item
+                                <i class="bi bi-plus-circle me-1"></i> New Stock Adjustment
                             </button>
                             <a href="@Url.Action("ExportTemplate", "StockAdjustment")" class="btn btn-outline-primary" id="btnExportTemplate">
                                 <i class="bi bi-download me-1"></i> Export Template
@@ -56,18 +56,19 @@
                                     <thead class="thead-light">
                                         <tr>
                                             <th style="width: 5%;">Sr No</th>
-                                            <th style="width: 15%;">Adjustment Type</th>
-                                            <th style="width: 12%;">Item Code</th>
-                                            <th style="width: 18%;">Item Description</th>
-                                            <th style="width: 12%;">Location</th>
-                                            <th style="width: 10%;">Qty</th>
-                                            <th style="width: 12%;">Cost</th>
-                                            <th style="width: 16%;">Action</th>
+                                            <th style="width: 13%;">Adjustment Type</th>
+                                            <th style="width: 10%;">Item Code</th>
+                                            <th style="width: 16%;">Item Description</th>
+                                            <th style="width: 10%;">Location</th>
+                                            <th style="width: 10%;">Stock On Hand</th>
+                                            <th style="width: 8%;">Qty</th>
+                                            <th style="width: 10%;">Cost</th>
+                                            <th style="width: 18%;">Action</th>
                                         </tr>
                                     </thead>
                                     <tbody id="itemsTableBody">
                                         <tr id="noDataRow">
-                                            <td colspan="8" class="text-center text-muted">No items added yet. Click "Add Item" to begin.</td>
+                                            <td colspan="9" class="text-center text-muted">No items added yet. Click "Add Item" to begin.</td>
                                         </tr>
                                     </tbody>
                                 </table>
@@ -196,13 +197,19 @@
                                 </select>
                             </div>
                         </div>
-                        <div class="col-md-3">
+                        <div class="col-md-2">
+                            <div class="form-group">
+                                <label class="form-label fw-semibold">Stock On Hand</label>
+                                <input type="text" class="form-control bg-light" id="modalStockOnHand" readonly placeholder="Auto-filled" />
+                            </div>
+                        </div>
+                        <div class="col-md-2">
                             <div class="form-group">
                                 <label for="modalQty" class="form-label fw-semibold">Quantity <span class="text-danger">*</span></label>
                                 <input type="number" class="form-control" id="modalQty" step="0.001" min="0.001" placeholder="Enter quantity" required />
                             </div>
                         </div>
-                        <div class="col-md-3">
+                        <div class="col-md-2">
                             <div class="form-group">
                                 <label class="form-label fw-semibold">Cost</label>
                                 <input type="text" class="form-control bg-light" id="modalCost" readonly placeholder="Auto-filled" />
@@ -269,7 +276,10 @@
 </div>
 
 @section scripts {
-    <script src="~/Scripts/StockAdjustment.js?v=@DateTime.Now.Ticks"></script>
+    <script>
+        var appBasePath = '@Url.Content("~/")'.replace(/\/+$/, '');
+    </script>
+    <script src="@Url.Content("~/Scripts/StockAdjustment.js")?v=@DateTime.Now.Ticks"></script>
 }
 
 <!-- Global Loading Spinner Overlay -->

@@ -17,6 +17,7 @@ namespace AOSmith.Services
         private const string SageItemsApiUrl = "https://sagetest.aosmith.in/Sage300.WebAPI2024/api/icitems";
         private const string SageItemSearchApiUrl = "https://sagetest.aosmith.in/Sage300.WebAPI2024/api/ItemSearch";
         private const string SageLocationsApiUrl = "https://sagetest.aosmith.in/Sage300.WebAPI2024/api/Locations";
+        private const string SageICStockApiUrl = "https://sagetest.aosmith.in/Sage300.WebAPI2024/api/GetICStock";
 
         private readonly IDatabaseHelper _dbHelper;
 
@@ -429,6 +430,35 @@ namespace AOSmith.Services
                     icitems = new List<SageItem>(),
                     status = -1,
                     Errors = new List<string> { $"Failed to search item: {ex.Message}" }
+                };
+            }
+        }
+
+        // ========== IC Stock API (for qtonhand) ==========
+
+        /// <summary>
+        /// Fetch stock quantity on hand from Sage300 GetICStock API for a specific item and location.
+        /// </summary>
+        public async Task<SageICStockResponse> GetICStockAsync(string companyName, string itemNo, string location)
+        {
+            try
+            {
+                var creds = await GetSageCredentialsAsync(companyName);
+                var url = $"{SageICStockApiUrl}?userid={Uri.EscapeDataString(creds.UserId)}&password={Uri.EscapeDataString(creds.Password)}&companyid={Uri.EscapeDataString(creds.CompanyId)}&itemno={Uri.EscapeDataString(itemNo)}&location={Uri.EscapeDataString(location)}";
+
+                var response = await _httpClient.GetAsync(url);
+                var responseBody = await response.Content.ReadAsStringAsync();
+
+                var result = JsonConvert.DeserializeObject<SageICStockResponse>(responseBody);
+                return result ?? new SageICStockResponse { itemstock = new List<SageICStockItem>(), status = -1 };
+            }
+            catch (Exception ex)
+            {
+                return new SageICStockResponse
+                {
+                    itemstock = new List<SageICStockItem>(),
+                    status = -1,
+                    Errors = new List<string> { $"Failed to fetch stock quantity: {ex.Message}" }
                 };
             }
         }

@@ -55,8 +55,13 @@ namespace AOSmith.Controllers
                     return Json(new { success = false, message = "You do not have permission to view approvals." }, JsonRequestBehavior.AllowGet);
                 }
 
-                // 1. Get all RecType 10 and 12 documents with approval summary
-                var companyParams = new Dictionary<string, object> { { "@CompanyName", companyName } };
+                // 1. Get RecType 10 and 12 documents with approval summary
+                // Only show documents where an approval record exists at the user's level
+                var companyParams = new Dictionary<string, object>
+                {
+                    { "@CompanyName", companyName },
+                    { "@UserLevel", userApprovalLevel }
+                };
 
                 var documentsQuery = @"
                     SELECT DISTINCT
@@ -116,6 +121,14 @@ namespace AOSmith.Controllers
                     INNER JOIN REC_Type_Master rm ON sa.Stock_REC_Type = rm.REC_Type
                     WHERE sa.Stock_REC_Type IN (10, 12)
                     AND sa.Stock_Company_Name = @CompanyName
+                    AND EXISTS (
+                        SELECT 1 FROM Stock_Adjustment_Approval al
+                        WHERE al.Approval_Company_Name = sa.Stock_Company_Name
+                        AND al.Approval_FIN_Year = sa.Stock_FIN_Year
+                        AND al.Approval_REC_Type = sa.Stock_REC_Type
+                        AND al.Approval_REC_Number = sa.Stock_REC_Number
+                        AND al.Approval_Level <= @UserLevel
+                    )
                     GROUP BY sa.Stock_Company_Name, sa.Stock_FIN_Year, sa.Stock_REC_Type, sa.Stock_REC_Number,
                              sa.Stock_Date, lm.Login_Name, dm.DEPT_Name, rm.REC_Name, rm.REC_Name2
                     ORDER BY sa.Stock_Date DESC, sa.Stock_REC_Number DESC";

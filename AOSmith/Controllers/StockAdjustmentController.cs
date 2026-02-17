@@ -198,6 +198,38 @@ namespace AOSmith.Controllers
         }
 
         /// <summary>
+        /// Fetch stock quantity on hand from Sage GetICStock API
+        /// </summary>
+        [HttpPost]
+        public async Task<JsonResult> GetStockQty(string itemCode, string location)
+        {
+            try
+            {
+                if (string.IsNullOrWhiteSpace(itemCode) || string.IsNullOrWhiteSpace(location))
+                {
+                    return Json(new { success = false, message = "Item code and location are required" });
+                }
+
+                var companyName = SessionHelper.GetCompanyName();
+                var response = await _sageService.GetICStockAsync(companyName, itemCode.Trim(), location.Trim());
+                if (response?.itemstock != null && response.itemstock.Any())
+                {
+                    var stock = response.itemstock.FirstOrDefault();
+                    if (stock != null)
+                    {
+                        return Json(new { success = true, qtonhand = stock.qtonhand });
+                    }
+                }
+
+                return Json(new { success = true, qtonhand = 0m });
+            }
+            catch (Exception ex)
+            {
+                return Json(new { success = false, message = ex.Message });
+            }
+        }
+
+        /// <summary>
         /// Export an Excel template with data validation dropdowns populated from Sage API and DB
         /// </summary>
         [HttpGet]

@@ -52,7 +52,7 @@
     function loadItemsFromApi()
     {
         return $.ajax({
-            url: '/StockAdjustment/SearchItems',
+            url: appBasePath + '/StockAdjustment/SearchItems',
             type: 'GET',
             data: { term: '' },
             success: function (response)
@@ -74,7 +74,7 @@
     function loadLocationsFromApi()
     {
         return $.ajax({
-            url: '/StockAdjustment/SearchLocations',
+            url: appBasePath + '/StockAdjustment/SearchLocations',
             type: 'GET',
             data: { term: '' },
             success: function (response)
@@ -97,7 +97,7 @@
     function loadDefaultAppLocation()
     {
         $.ajax({
-            url: '/StockAdjustment/GetDefaultLocation',
+            url: appBasePath + '/StockAdjustment/GetDefaultLocation',
             type: 'POST',
             success: function (response)
             {
@@ -190,6 +190,12 @@
         // Bind Select2 change events for item code
         $('#modalItemCode').off('select2:select select2:clear').on('select2:select select2:clear', function () {
             loadItemDescription($(this).val());
+            loadStockQty();
+        });
+
+        // Bind Select2 change events for location (to fetch stock qty)
+        $('#modalLocation').off('select2:select select2:clear').on('select2:select select2:clear', function () {
+            loadStockQty();
         });
     }
 
@@ -208,6 +214,12 @@
         // Item Code selection - auto-fill description (delegated for dynamically populated dropdown)
         $(document).on('change', '#modalItemCode', function () {
             loadItemDescription($(this).val());
+            loadStockQty();
+        });
+
+        // Location selection - fetch stock qty
+        $(document).on('change', '#modalLocation', function () {
+            loadStockQty();
         });
 
         // File upload change events
@@ -310,6 +322,7 @@
                 '<td>' + escapeHtml(item.itemCode) + '</td>' +
                 '<td>' + escapeHtml(item.itemDescription) + '</td>' +
                 '<td>' + escapeHtml(item.locationName) + '</td>' +
+                '<td>' + (item.stockOnHand ? parseFloat(item.stockOnHand).toFixed(3) : '0.000') + '</td>' +
                 '<td>' + item.qty.toFixed(3) + '</td>' +
                 '<td>' + (item.cost ? parseFloat(item.cost).toFixed(4) : '0.0000') + '</td>' +
                 '</tr>';
@@ -333,7 +346,7 @@
             '<h6 class="fw-bold mb-3">Items (' + gridData.length + ')</h6>' +
             '<div class="table-responsive mb-4"><table class="table table-bordered table-sm">' +
             '<thead class="table-light"><tr>' +
-            '<th>Sr No</th><th>Adj Type</th><th>Item Code</th><th>Description</th><th>Location</th><th>Qty</th><th>Cost</th>' +
+            '<th>Sr No</th><th>Adj Type</th><th>Item Code</th><th>Description</th><th>Location</th><th>Stock On Hand</th><th>Qty</th><th>Cost</th>' +
             '</tr></thead><tbody>' + itemsHtml + '</tbody></table></div>' +
             '<h6 class="fw-bold mb-3">Attachments (' + Object.keys(uploadedFiles).length + ')</h6>' +
             '<ul class="list-unstyled">' + filesHtml + '</ul>' +
@@ -368,6 +381,7 @@
         $('#editIndex').val(index);
         $('#modalItemDesc').val('');
         $('#modalCost').val('');
+        $('#modalStockOnHand').val('');
 
         // Show modal first so Select2 can measure properly
         var myModal = new bootstrap.Modal(document.getElementById('itemModal'));
@@ -388,6 +402,7 @@
                 $('#modalQty').val(item.qty);
                 $('#modalItemDesc').val(item.itemDescription);
                 $('#modalCost').val(item.cost ? parseFloat(item.cost).toFixed(4) : '');
+                $('#modalStockOnHand').val(item.stockOnHand != null ? parseFloat(item.stockOnHand).toFixed(3) : '');
             } else {
                 // Add mode
                 $('#stockRecSno').val(nextStockRecSno);
@@ -415,7 +430,7 @@
         } else
         {
             $.ajax({
-                url: '/StockAdjustment/GetItemDetails',
+                url: appBasePath + '/StockAdjustment/GetItemDetails',
                 type: 'POST',
                 data: { itemCode: itemCode },
                 success: function (response)
@@ -436,7 +451,7 @@
     {
         $('#modalCost').val('Loading...');
         $.ajax({
-            url: '/StockAdjustment/GetItemCost',
+            url: appBasePath + '/StockAdjustment/GetItemCost',
             type: 'POST',
             data: { itemCode: itemCode },
             success: function (response)
@@ -450,6 +465,37 @@
             error: function () {
                 $('#modalCost').val('');
                 showAlert('Error fetching item cost from Sage', 'error');
+            }
+        });
+    }
+
+    // Fetch stock quantity on hand from Sage GetICStock API
+    function loadStockQty()
+    {
+        var itemCode = $('#modalItemCode').val();
+        var location = $('#modalLocation').val();
+
+        if (!itemCode || !location) {
+            $('#modalStockOnHand').val('');
+            return;
+        }
+
+        $('#modalStockOnHand').val('Loading...');
+        $.ajax({
+            url: appBasePath + '/StockAdjustment/GetStockQty',
+            type: 'POST',
+            data: { itemCode: itemCode, location: location },
+            success: function (response)
+            {
+                if (response.success) {
+                    $('#modalStockOnHand').val(response.qtonhand != null ? parseFloat(response.qtonhand).toFixed(3) : '0.000');
+                } else {
+                    $('#modalStockOnHand').val('');
+                }
+            },
+            error: function () {
+                $('#modalStockOnHand').val('');
+                showAlert('Error fetching stock quantity from Sage', 'error');
             }
         });
     }
@@ -473,6 +519,7 @@
         var locationName = getLocationDisplayText(location);
         var qty = parseFloat($('#modalQty').val());
         var cost = $('#modalCost').val();
+        var stockOnHand = $('#modalStockOnHand').val();
 
         if (!recType) {
             showAlert('Please select an Adjustment Type', 'warning');
@@ -521,7 +568,8 @@
             toLocation: toLocation,
             toLocationName: toLocationName,
             qty: qty,
-            cost: cost
+            cost: cost,
+            stockOnHand: stockOnHand
         };
 
         if (editIndex >= 0) {
@@ -547,7 +595,7 @@
         tbody.empty();
 
         if (gridData.length === 0) {
-            tbody.append('<tr id="noDataRow"><td colspan="8" class="text-center text-muted">No items added yet. Click "Add Item" to begin.</td></tr>');
+            tbody.append('<tr id="noDataRow"><td colspan="9" class="text-center text-muted">No items added yet. Click "Add Item" to begin.</td></tr>');
             updateRateSummary();
             return;
         }
@@ -555,12 +603,14 @@
         gridData.forEach(function (item, index) {
             var displaySno = index + 1;
             var costDisplay = item.cost ? parseFloat(item.cost).toFixed(4) : '0.0000';
+            var stockOnHandDisplay = item.stockOnHand ? parseFloat(item.stockOnHand).toFixed(3) : '0.000';
             var row = '<tr>' +
                 '<td>' + displaySno + '</td>' +
                 '<td>' + escapeHtml(item.recTypeName) + '</td>' +
                 '<td>' + escapeHtml(item.itemCode) + '</td>' +
                 '<td>' + escapeHtml(item.itemDescription) + '</td>' +
                 '<td>' + escapeHtml(item.locationName) + '</td>' +
+                '<td>' + stockOnHandDisplay + '</td>' +
                 '<td>' + item.qty.toFixed(3) + '</td>' +
                 '<td>' + costDisplay + '</td>' +
                 '<td>' +
@@ -641,7 +691,7 @@
         showSpinner('Submitting stock adjustment...');
 
         $.ajax({
-            url: '/StockAdjustment/SaveStockAdjustment',
+            url: appBasePath + '/StockAdjustment/SaveStockAdjustment',
             type: 'POST',
             data: formData,
             processData: false,
@@ -783,7 +833,7 @@
         showSpinner('Importing and validating Excel file...');
 
         $.ajax({
-            url: '/StockAdjustment/ImportExcel',
+            url: appBasePath + '/StockAdjustment/ImportExcel',
             type: 'POST',
             data: formData,
             processData: false,

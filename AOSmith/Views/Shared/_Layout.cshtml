@@ -83,6 +83,13 @@
                                 Stock Adjustment
                             </a>
                         </li>
+                        <li class="nav-item">
+                            <a class="nav-link @(ViewContext.RouteData.Values["Controller"].ToString() == "Reports" ? "active bg-primary text-white" : "text-secondary")"
+                               href="@Url.Action("Index", "Reports")">
+                                <i class="bi bi-file-earmark-bar-graph me-2"></i>
+                                Reports
+                            </a>
+                        </li>
                         @if (AOSmith.Helpers.SessionHelper.IsApprover())
                         {
                             <li class="nav-item">
@@ -127,6 +134,13 @@
                                href="@Url.Action("Create", "StockAdjustment")">
                                 <i class="bi bi-box-seam me-2"></i>
                                 Stock Adjustment
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link @(ViewContext.RouteData.Values["Controller"].ToString() == "Reports" ? "active bg-primary text-white" : "text-secondary")"
+                               href="@Url.Action("Index", "Reports")">
+                                <i class="bi bi-file-earmark-bar-graph me-2"></i>
+                                Reports
                             </a>
                         </li>
                         @if (AOSmith.Helpers.SessionHelper.IsApprover())

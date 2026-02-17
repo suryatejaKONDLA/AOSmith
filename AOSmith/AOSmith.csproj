@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="15.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
   <PropertyGroup>
@@ -130,6 +130,7 @@
     <Compile Include="Controllers\ApplicationOptionsController.cs" />
     <Compile Include="Controllers\ApprovalController.cs" />
     <Compile Include="Controllers\HomeController.cs" />
+    <Compile Include="Controllers\ReportsController.cs" />
     <Compile Include="Controllers\StockAdjustmentController.cs" />
     <Compile Include="Filters\AuthFilter.cs" />
     <Compile Include="Global.asax.cs">
@@ -178,6 +179,7 @@
     <Compile Include="Models\SageAdjustmentEntryResponse.cs" />
     <Compile Include="Models\SageItemResponse.cs" />
     <Compile Include="Models\SageLocationResponse.cs" />
+    <Compile Include="Models\SageICStockResponse.cs" />
   </ItemGroup>
   <ItemGroup>
     <Content Include="Content\bootstrap-grid.css" />
@@ -196,6 +198,7 @@
     <Content Include="Content\bootstrap.min.css" />
     <Content Include="Content\bootstrap.rtl.css" />
     <Content Include="Content\bootstrap.rtl.min.css" />
+    <Content Include="Content\Images\login-logo.png" />
     <Content Include="favicon.ico" />
     <Content Include="Global.asax" />
     <Content Include="Content\Site.css" />
@@ -230,10 +233,12 @@
     <Content Include="Views\Shared\Error.cshtml" />
     <Content Include="Views\Shared\_Layout.cshtml" />
     <Content Include="Views\Account\Login.cshtml" />
-    <Content Include="Views\Home\Index.cshtml" />
+        <Content Include="Views\Home\Index.cshtml" />
+    <Content Include="Views\Home\ManageUsers.cshtml" />
     <Content Include="Views\StockAdjustment\Create.cshtml" />
     <Content Include="Views\ApplicationOptions\Index.cshtml" />
     <Content Include="Views\Approval\Index.cshtml" />
+    <Content Include="Views\Reports\Index.cshtml" />
   </ItemGroup>
   <ItemGroup>
     <Folder Include="App_Data\" />
