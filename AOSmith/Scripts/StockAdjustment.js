@@ -709,28 +709,102 @@
                     var reviewModal = bootstrap.Modal.getInstance(reviewModalEl);
                     reviewModal.hide();
 
-                    if (response.sageResults && response.sageResults.length > 0) {
-                        showSageResponseModal(response.message, response.sageResults);
-                    } else
-                    {
-                        showAlert('Stock adjustment saved successfully!', 'success');
-                        setTimeout(function () { window.location.reload(); }, 2000);
-                    }
+                    // Show success popup that user must acknowledge
+                    showSuccessPopup(response.message || 'Stock adjustment saved successfully!');
                 } else
                 {
-                    showAlert(response.message || 'Failed to save stock adjustment', 'error');
-                    if (response.sageResults && response.sageResults.length > 0) {
-                        showSageResponseModal(response.message, response.sageResults);
-                    }
+                    showErrorPopup(response.message || 'Failed to save stock adjustment', response.sageResults);
                     $('#btnConfirmSubmit').prop('disabled', false).html('<i class="bi bi-check-circle me-2"></i>Confirm & Submit');
                 }
             },
             error: function () {
                 hideSpinner();
-                showAlert('An error occurred while saving', 'error');
+                showErrorPopup('An error occurred while saving');
                 $('#btnConfirmSubmit').prop('disabled', false).html('<i class="bi bi-check-circle me-2"></i>Confirm & Submit');
             }
         });
+    }
+
+    // Show success popup modal — user must click OK, then page reloads
+    function showSuccessPopup(message)
+    {
+        $('#resultPopupModal').remove();
+        var html = '<div class="modal fade" id="resultPopupModal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false">' +
+            '<div class="modal-dialog modal-dialog-centered"><div class="modal-content border-0 shadow">' +
+            '<div class="modal-body text-center p-5">' +
+            '<div class="mb-3"><i class="bi bi-check-circle-fill text-success" style="font-size:4rem;"></i></div>' +
+            '<h4 class="fw-bold text-success mb-3">Success!</h4>' +
+            '<p class="fs-5 mb-0">' + escapeHtml(message) + '</p>' +
+            '</div>' +
+            '<div class="modal-footer justify-content-center border-0 pb-4">' +
+            '<button type="button" class="btn btn-success px-5 btn-lg" id="btnResultOk"><i class="bi bi-check-lg me-2"></i>OK</button>' +
+            '</div></div></div></div>';
+        $('body').append(html);
+        var modal = new bootstrap.Modal(document.getElementById('resultPopupModal'));
+        modal.show();
+        $('#btnResultOk').on('click', function () {
+            modal.hide();
+            window.location.reload();
+        });
+    }
+
+    // Show error popup modal with optional Sage API response details
+    function showErrorPopup(message, sageResults)
+    {
+        $('#resultPopupModal').remove();
+
+        var sageDetailsHtml = '';
+        if (sageResults && sageResults.length > 0) {
+            sageDetailsHtml += '<div class="text-start mt-4">';
+            sageResults.forEach(function (sage, index) {
+                var isSuccess = sage.isSuccess === true;
+                var statusClass = isSuccess ? 'success' : 'danger';
+                var statusIcon = isSuccess ? 'bi-check-circle-fill' : 'bi-x-circle-fill';
+                var docRef = sage.documentReference || ('RecType ' + sage.recType);
+
+                sageDetailsHtml += '<div class="card mb-2 border-' + statusClass + '">' +
+                    '<div class="card-header bg-' + statusClass + ' bg-opacity-10 py-2 d-flex justify-content-between align-items-center">' +
+                    '<span><i class="bi ' + statusIcon + ' text-' + statusClass + ' me-1"></i><strong>' + escapeHtml(docRef) + '</strong></span>' +
+                    '<span class="badge bg-' + statusClass + '">' + escapeHtml(String(sage.sageStatus || 'Unknown')) + '</span></div>' +
+                    '<div class="card-body py-2"><small><strong>Message:</strong> ' + escapeHtml(sage.sageMessage || 'No message') + '</small>';
+
+                if (sage.sageRawRequest || sage.sageRawResponse) {
+                    sageDetailsHtml += '<div class="mt-2">';
+                    if (sage.sageRawRequest) {
+                        sageDetailsHtml += '<button class="btn btn-sm btn-outline-primary me-1" type="button" data-bs-toggle="collapse" data-bs-target="#errReq' + index + '"><i class="bi bi-arrow-up-circle me-1"></i>Request</button>';
+                    }
+                    if (sage.sageRawResponse) {
+                        sageDetailsHtml += '<button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#errRes' + index + '"><i class="bi bi-arrow-down-circle me-1"></i>Response</button>';
+                    }
+                    if (sage.sageRawRequest) {
+                        sageDetailsHtml += '<div class="collapse mt-2" id="errReq' + index + '"><pre class="bg-dark text-light p-2 rounded" style="max-height:200px;overflow-y:auto;font-size:0.8rem;white-space:pre-wrap;">' + escapeHtml(formatJson(sage.sageRawRequest) || 'No request data') + '</pre></div>';
+                    }
+                    if (sage.sageRawResponse) {
+                        sageDetailsHtml += '<div class="collapse mt-2" id="errRes' + index + '"><pre class="bg-dark text-light p-2 rounded" style="max-height:200px;overflow-y:auto;font-size:0.8rem;white-space:pre-wrap;">' + escapeHtml(formatJson(sage.sageRawResponse) || 'No response data') + '</pre></div>';
+                    }
+                    sageDetailsHtml += '</div>';
+                }
+
+                sageDetailsHtml += '</div></div>';
+            });
+            sageDetailsHtml += '</div>';
+        }
+
+        var html = '<div class="modal fade" id="resultPopupModal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false">' +
+            '<div class="modal-dialog modal-dialog-centered' + (sageResults && sageResults.length > 0 ? ' modal-lg' : '') + '"><div class="modal-content border-0 shadow">' +
+            '<div class="modal-body text-center p-4">' +
+            '<div class="mb-3"><i class="bi bi-x-circle-fill text-danger" style="font-size:4rem;"></i></div>' +
+            '<h4 class="fw-bold text-danger mb-3">Transaction Failed</h4>' +
+            '<p class="mb-1">' + escapeHtml(message) + '</p>' +
+            '<p class="text-muted small">All records for this transaction have been rolled back.</p>' +
+            sageDetailsHtml +
+            '</div>' +
+            '<div class="modal-footer justify-content-center border-0 pb-4">' +
+            '<button type="button" class="btn btn-danger px-5 btn-lg" data-bs-dismiss="modal"><i class="bi bi-x-lg me-2"></i>Close</button>' +
+            '</div></div></div></div>';
+        $('body').append(html);
+        var modal = new bootstrap.Modal(document.getElementById('resultPopupModal'));
+        modal.show();
     }
 
     // Show toast notification

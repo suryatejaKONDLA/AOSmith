@@ -183,6 +183,7 @@ namespace AOSmith.Services
                 TransDate = transDateStr,
                 ExpArDate = expArDateStr,
                 HdrDesc = $"Inventory transfer - Stock {recTypeName2} #{recNumber}",
+                TransType = 6,
                 TransHeaderOptFields = new List<SageOptField>(),
                 Items = lineItems.Select(item => new SageTransferItem
                 {

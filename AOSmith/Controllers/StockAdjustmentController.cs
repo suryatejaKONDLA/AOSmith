@@ -664,12 +664,17 @@ namespace AOSmith.Controllers
                 var sessionId = SessionHelper.GetUserId() ?? 1;
                 var companyName = SessionHelper.GetCompanyName();
 
-                // Group line items by RecType (since database structure requires separate transactions per RecType)
-                var groupedByRecType = lineItems.GroupBy(x => x.RecType);
+                // Group line items by RecType for separate DB/Sage processing
+                var groupedByRecType = lineItems.GroupBy(x => x.RecType).ToList();
 
                 var successMessages = new List<string>();
                 var errorMessages = new List<string>();
                 var sageResponses = new List<object>();
+
+                // The SP generates the record number on first call (when 0 is passed).
+                // Subsequent calls reuse the same number so all RecTypes share one record.
+                int recordNumber = 0;
+                int finYear = 0;
 
                 // Process each RecType group as a separate transaction
                 foreach (var group in groupedByRecType)
@@ -688,20 +693,25 @@ namespace AOSmith.Controllers
                     var stockFilesTable = CreateStockFilesDataTable(); // Empty for now
 
                     // Prepare stored procedure parameters
+                    var finYearParam = new System.Data.SqlClient.SqlParameter("@StockFinYear", System.Data.SqlDbType.Int)
+                    {
+                        Direction = System.Data.ParameterDirection.InputOutput,
+                        Value = finYear // 0 on first call; SP auto-generates and returns via OUTPUT
+                    };
+                    var recNumberParam = new System.Data.SqlClient.SqlParameter("@StockRecNumber", System.Data.SqlDbType.Int)
+                    {
+                        Direction = System.Data.ParameterDirection.InputOutput,
+                        Value = recordNumber // 0 on first call; SP generates and returns via OUTPUT
+                    };
+
                     var parameters = new List<System.Data.SqlClient.SqlParameter>
                     {
-                        new System.Data.SqlClient.SqlParameter("@StockFinYear", System.Data.SqlDbType.Int)
-                        {
-                            Value = 0 // Auto-generate
-                        },
+                        finYearParam,
                         new System.Data.SqlClient.SqlParameter("@StockRecType", System.Data.SqlDbType.Int)
                         {
                             Value = recType
                         },
-                        new System.Data.SqlClient.SqlParameter("@StockRecNumber", System.Data.SqlDbType.Int)
-                        {
-                            Value = 0 // Insert mode (0 = new, >0 = edit)
-                        },
+                        recNumberParam,
                         new System.Data.SqlClient.SqlParameter("@StockDate", System.Data.SqlDbType.Date)
                         {
                             Value = transactionDate
@@ -736,19 +746,19 @@ namespace AOSmith.Controllers
                     {
                         successMessages.Add(result.ResultMessage);
 
-                        // Extract document info for email
-                        var recNumber = ExtractRecNumber(result.ResultMessage);
+                        // Read generated values directly from OUTPUT params
+                        if (recordNumber == 0)
+                        {
+                            recordNumber = Convert.ToInt32(recNumberParam.Value);
+                            finYear = Convert.ToInt32(finYearParam.Value);
+                        }
+
+                        var recNumber = recordNumber;
                         var documentReference = ExtractDocumentReference(result.ResultMessage);
 
                         // Send email notification to L1 approver (non-blocking)
                         try
                         {
-                            var finYear = 0;
-                            var finYearMatch = System.Text.RegularExpressions.Regex.Match(
-                                result.ResultMessage, @"(\d{6})/",
-                                System.Text.RegularExpressions.RegexOptions.IgnoreCase);
-                            if (finYearMatch.Success) int.TryParse(finYearMatch.Groups[1].Value, out finYear);
-
                             await _emailService.SendRecordCreatedEmailAsync(finYear, recType, recNumber, documentReference);
                         }
                         catch { /* email failure should not break save */ }
@@ -756,7 +766,6 @@ namespace AOSmith.Controllers
                         // RecType 10 (Stock Decrease) → send to Sage Transfer Entry immediately
                         if (recType == 10)
                         {
-                            var finYear = ExtractFinYear(result.ResultMessage);
                             var sageResponse = await _sageService.SendTransferEntryAsync(
                                 companyName, finYear, items, transactionDate, recNumber, recType);
 
@@ -785,7 +794,6 @@ namespace AOSmith.Controllers
                                 };
                                 await _dbHelper.ExecuteNonQueryAsync(rollbackQuery, rollbackParams);
 
-                                // Remove from success, add to error
                                 successMessages.RemoveAt(successMessages.Count - 1);
                                 var sageErrors = sageResponse.Errors != null && sageResponse.Errors.Count > 0
                                     ? string.Join("; ", sageResponse.Errors)
@@ -849,14 +857,56 @@ namespace AOSmith.Controllers
                     }
                 }
 
+                // If ANY transaction failed, rollback ALL RecTypes for this record number
+                if (errorMessages.Any() && recordNumber > 0 && finYear > 0)
+                {
+                    var fullRollbackQuery = @"
+                        DELETE FROM Stock_Adjustment_Files
+                        WHERE File_Company_Name = @CompanyName AND File_FIN_Year = @FinYear
+                        AND File_REC_Number = @RecNumber;
+
+                        DELETE FROM Stock_Adjustment_Approval
+                        WHERE Approval_Company_Name = @CompanyName AND Approval_FIN_Year = @FinYear
+                        AND Approval_REC_Number = @RecNumber;
+
+                        DELETE FROM Stock_Adjustment
+                        WHERE Stock_Company_Name = @CompanyName AND Stock_FIN_Year = @FinYear
+                        AND Stock_REC_Number = @RecNumber;";
+
+                    var fullRollbackParams = new Dictionary<string, object>
+                    {
+                        { "@CompanyName", companyName },
+                        { "@FinYear", finYear },
+                        { "@RecNumber", recordNumber }
+                    };
+                    await _dbHelper.ExecuteNonQueryAsync(fullRollbackQuery, fullRollbackParams);
+
+                    // Mark all sageResponses as rolled back
+                    sageResponses = sageResponses.Select(r =>
+                    {
+                        dynamic d = r;
+                        return (object)new
+                        {
+                            d.recType,
+                            d.recNumber,
+                            d.documentReference,
+                            sageStatus = d.isSuccess == true ? "Rolled Back" : d.sageStatus,
+                            sageMessage = d.isSuccess == true ? "Rolled back due to failure in another transaction." : d.sageMessage,
+                            isSuccess = false,
+                            d.sageRawResponse,
+                            d.sageRawRequest
+                        };
+                    }).ToList();
+                }
+
                 // Return consolidated result
                 if (errorMessages.Any())
                 {
                     return Json(new
                     {
                         success = false,
-                        message = "Some transactions failed:\n" + string.Join("\n", errorMessages),
-                        successCount = successMessages.Count,
+                        message = "Transaction failed and has been rolled back:\n" + string.Join("\n", errorMessages),
+                        successCount = 0,
                         errorCount = errorMessages.Count,
                         resultType = "error",
                         sageResults = sageResponses
@@ -864,9 +914,23 @@ namespace AOSmith.Controllers
                 }
                 else
                 {
-                    var consolidatedMessage = successMessages.Count == 1
-                        ? successMessages[0]
-                        : $"{successMessages.Count} transactions created successfully:\n" + string.Join("\n", successMessages);
+                    // Build a single unified message with the shared record number
+                    string consolidatedMessage;
+                    if (successMessages.Count == 1)
+                    {
+                        consolidatedMessage = successMessages[0];
+                    }
+                    else
+                    {
+                        // Extract document reference from first message (format: "...FinYear/Company/RecTypeName/RecNumber...")
+                        var docRef = ExtractDocumentReference(successMessages[0]);
+                        var parts = docRef.Split('/');
+                        // Show unified: FinYear/Company/RecNumber
+                        if (parts.Length >= 4)
+                            consolidatedMessage = $"Stock Adjustment {parts[0]}/{parts[1]}/{parts[3]} created successfully.";
+                        else
+                            consolidatedMessage = successMessages[0];
+                    }
 
                     return Json(new
                     {

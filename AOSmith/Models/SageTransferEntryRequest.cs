@@ -29,6 +29,9 @@ namespace AOSmith.Models
         [JsonProperty("hdrdesc")]
         public string HdrDesc { get; set; }
 
+        [JsonProperty("transtype")]
+        public int TransType { get; set; }
+
         [JsonProperty("transHeaderOptFields")]
         public List<SageOptField> TransHeaderOptFields { get; set; } = new List<SageOptField>();
 

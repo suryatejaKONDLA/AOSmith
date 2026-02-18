@@ -1,0 +1,190 @@
+[2026-02-18 09:46:42] SendRecordCreatedEmail START - FinYear=202526, RecType=10, RecNumber=1, DocRef=202526/SMDAT/TRN/1
+[2026-02-18 09:46:42] Mail config loaded: Host=smtp.gmail.com, Port=587, From=cradleitl@gmail.com
+, SSL=True
+[2026-02-18 09:46:42] L1 approvers found: Hanmant Sharma <rupali@tresilient.com>
+[2026-02-18 09:46:42] Sending record-created email to Hanmant Sharma <rupali@tresilient.com>
+[2026-02-18 09:46:42] SMTP connecting: Host=smtp.gmail.com, Port=587, SSL=True, From=cradleitl@gmail.com
+, To=rupali@tresilient.com
+[2026-02-18 09:46:42] Subject: New Stock Decrease Pending Approval - 202526/SMDAT/TRN/1
+[2026-02-18 09:46:47] EMAIL SENT SUCCESSFULLY to rupali@tresilient.com
+[2026-02-18 09:46:47] SendRecordCreatedEmail COMPLETE
+[2026-02-18 09:46:49] SendRecordCreatedEmail START - FinYear=202526, RecType=12, RecNumber=1, DocRef=202526/SMDAT/ADJ/1
+[2026-02-18 09:46:49] Mail config loaded: Host=smtp.gmail.com, Port=587, From=cradleitl@gmail.com
+, SSL=True
+[2026-02-18 09:46:49] L1 approvers found: Hanmant Sharma <rupali@tresilient.com>
+[2026-02-18 09:46:49] Sending record-created email to Hanmant Sharma <rupali@tresilient.com>
+[2026-02-18 09:46:49] SMTP connecting: Host=smtp.gmail.com, Port=587, SSL=True, From=cradleitl@gmail.com
+, To=rupali@tresilient.com
+[2026-02-18 09:46:49] Subject: New Stock Increase Pending Approval - 202526/SMDAT/ADJ/1
+[2026-02-18 09:46:54] EMAIL SENT SUCCESSFULLY to rupali@tresilient.com
+[2026-02-18 09:46:54] SendRecordCreatedEmail COMPLETE
+[2026-02-18 09:51:30] SendRecordCreatedEmail START - FinYear=202526, RecType=10, RecNumber=1, DocRef=202526/SMDAT/TRN/1
+[2026-02-18 09:51:30] Mail config loaded: Host=smtp.gmail.com, Port=587, From=cradleitl@gmail.com
+, SSL=True
+[2026-02-18 09:51:30] L1 approvers found: Hanmant Sharma <rupali@tresilient.com>
+[2026-02-18 09:51:30] Sending record-created email to Hanmant Sharma <rupali@tresilient.com>
+[2026-02-18 09:51:30] SMTP connecting: Host=smtp.gmail.com, Port=587, SSL=True, From=cradleitl@gmail.com
+, To=rupali@tresilient.com
+[2026-02-18 09:51:30] Subject: New Stock Decrease Pending Approval - 202526/SMDAT/TRN/1
+[2026-02-18 09:51:35] EMAIL SENT SUCCESSFULLY to rupali@tresilient.com
+[2026-02-18 09:51:35] SendRecordCreatedEmail COMPLETE
+[2026-02-18 09:51:35] SendRecordCreatedEmail START - FinYear=202526, RecType=12, RecNumber=1, DocRef=202526/SMDAT/ADJ/1
+[2026-02-18 09:51:35] Mail config loaded: Host=smtp.gmail.com, Port=587, From=cradleitl@gmail.com
+, SSL=True
+[2026-02-18 09:51:35] L1 approvers found: Hanmant Sharma <rupali@tresilient.com>
+[2026-02-18 09:51:35] Sending record-created email to Hanmant Sharma <rupali@tresilient.com>
+[2026-02-18 09:51:35] SMTP connecting: Host=smtp.gmail.com, Port=587, SSL=True, From=cradleitl@gmail.com
+, To=rupali@tresilient.com
+[2026-02-18 09:51:35] Subject: New Stock Increase Pending Approval - 202526/SMDAT/ADJ/1
+[2026-02-18 09:51:40] EMAIL SENT SUCCESSFULLY to rupali@tresilient.com
+[2026-02-18 09:51:41] SendRecordCreatedEmail COMPLETE
+[2026-02-18 09:52:06] SendRecordCreatedEmail START - FinYear=202526, RecType=10, RecNumber=2, DocRef=202526/SMDAT/TRN/2
+[2026-02-18 09:52:06] Mail config loaded: Host=smtp.gmail.com, Port=587, From=cradleitl@gmail.com
+, SSL=True
+[2026-02-18 09:52:06] L1 approvers found: Hanmant Sharma <rupali@tresilient.com>
+[2026-02-18 09:52:06] Sending record-created email to Hanmant Sharma <rupali@tresilient.com>
+[2026-02-18 09:52:06] SMTP connecting: Host=smtp.gmail.com, Port=587, SSL=True, From=cradleitl@gmail.com
+, To=rupali@tresilient.com
+[2026-02-18 09:52:06] Subject: New Stock Decrease Pending Approval - 202526/SMDAT/TRN/2
+[2026-02-18 09:52:11] EMAIL SENT SUCCESSFULLY to rupali@tresilient.com
+[2026-02-18 09:52:11] SendRecordCreatedEmail COMPLETE
+[2026-02-18 09:52:42] SendRecordCreatedEmail START - FinYear=202526, RecType=10, RecNumber=3, DocRef=202526/SMDAT/TRN/3
+[2026-02-18 09:52:42] Mail config loaded: Host=smtp.gmail.com, Port=587, From=cradleitl@gmail.com
+, SSL=True
+[2026-02-18 09:52:42] L1 approvers found: Hanmant Sharma <rupali@tresilient.com>
+[2026-02-18 09:52:42] Sending record-created email to Hanmant Sharma <rupali@tresilient.com>
+[2026-02-18 09:52:42] SMTP connecting: Host=smtp.gmail.com, Port=587, SSL=True, From=cradleitl@gmail.com
+, To=rupali@tresilient.com
+[2026-02-18 09:52:42] Subject: New Stock Decrease Pending Approval - 202526/SMDAT/TRN/3
+[2026-02-18 09:52:47] EMAIL SENT SUCCESSFULLY to rupali@tresilient.com
+[2026-02-18 09:52:47] SendRecordCreatedEmail COMPLETE
+[2026-02-18 09:52:59] SendRecordCreatedEmail START - FinYear=202526, RecType=12, RecNumber=4, DocRef=202526/SMDAT/ADJ/4
+[2026-02-18 09:52:59] Mail config loaded: Host=smtp.gmail.com, Port=587, From=cradleitl@gmail.com
+, SSL=True
+[2026-02-18 09:52:59] L1 approvers found: Hanmant Sharma <rupali@tresilient.com>
+[2026-02-18 09:52:59] Sending record-created email to Hanmant Sharma <rupali@tresilient.com>
+[2026-02-18 09:52:59] SMTP connecting: Host=smtp.gmail.com, Port=587, SSL=True, From=cradleitl@gmail.com
+, To=rupali@tresilient.com
+[2026-02-18 09:52:59] Subject: New Stock Increase Pending Approval - 202526/SMDAT/ADJ/4
+[2026-02-18 09:53:04] EMAIL SENT SUCCESSFULLY to rupali@tresilient.com
+[2026-02-18 09:53:04] SendRecordCreatedEmail COMPLETE
+[2026-02-18 09:59:07] SendRecordCreatedEmail START - FinYear=202526, RecType=10, RecNumber=5, DocRef=202526/SMDAT/TRN/5
+[2026-02-18 09:59:07] Mail config loaded: Host=smtp.gmail.com, Port=587, From=cradleitl@gmail.com
+, SSL=True
+[2026-02-18 09:59:07] L1 approvers found: Hanmant Sharma <rupali@tresilient.com>
+[2026-02-18 09:59:07] Sending record-created email to Hanmant Sharma <rupali@tresilient.com>
+[2026-02-18 09:59:07] SMTP connecting: Host=smtp.gmail.com, Port=587, SSL=True, From=cradleitl@gmail.com
+, To=rupali@tresilient.com
+[2026-02-18 09:59:07] Subject: New Stock Decrease Pending Approval - 202526/SMDAT/TRN/5
+[2026-02-18 09:59:12] EMAIL SENT SUCCESSFULLY to rupali@tresilient.com
+[2026-02-18 09:59:12] SendRecordCreatedEmail COMPLETE
+[2026-02-18 09:59:12] SendRecordCreatedEmail START - FinYear=202526, RecType=12, RecNumber=5, DocRef=202526/SMDAT/ADJ/5
+[2026-02-18 09:59:12] Mail config loaded: Host=smtp.gmail.com, Port=587, From=cradleitl@gmail.com
+, SSL=True
+[2026-02-18 09:59:12] L1 approvers found: Hanmant Sharma <rupali@tresilient.com>
+[2026-02-18 09:59:12] Sending record-created email to Hanmant Sharma <rupali@tresilient.com>
+[2026-02-18 09:59:12] SMTP connecting: Host=smtp.gmail.com, Port=587, SSL=True, From=cradleitl@gmail.com
+, To=rupali@tresilient.com
+[2026-02-18 09:59:12] Subject: New Stock Increase Pending Approval - 202526/SMDAT/ADJ/5
+[2026-02-18 09:59:17] EMAIL SENT SUCCESSFULLY to rupali@tresilient.com
+[2026-02-18 09:59:17] SendRecordCreatedEmail COMPLETE
+[2026-02-18 10:02:18] SendRecordCreatedEmail START - FinYear=202526, RecType=10, RecNumber=1, DocRef=202526/SMDAT/TRN/1
+[2026-02-18 10:02:18] Mail config loaded: Host=smtp.gmail.com, Port=587, From=cradleitl@gmail.com
+, SSL=True
+[2026-02-18 10:02:18] L1 approvers found: Hanmant Sharma <rupali@tresilient.com>
+[2026-02-18 10:02:18] Sending record-created email to Hanmant Sharma <rupali@tresilient.com>
+[2026-02-18 10:02:18] SMTP connecting: Host=smtp.gmail.com, Port=587, SSL=True, From=cradleitl@gmail.com
+, To=rupali@tresilient.com
+[2026-02-18 10:02:18] Subject: New Stock Decrease Pending Approval - 202526/SMDAT/TRN/1
+[2026-02-18 10:02:22] EMAIL SENT SUCCESSFULLY to rupali@tresilient.com
+[2026-02-18 10:02:23] SendRecordCreatedEmail COMPLETE
+[2026-02-18 10:02:23] SendRecordCreatedEmail START - FinYear=202526, RecType=12, RecNumber=1, DocRef=202526/SMDAT/ADJ/1
+[2026-02-18 10:02:23] Mail config loaded: Host=smtp.gmail.com, Port=587, From=cradleitl@gmail.com
+, SSL=True
+[2026-02-18 10:02:23] L1 approvers found: Hanmant Sharma <rupali@tresilient.com>
+[2026-02-18 10:02:23] Sending record-created email to Hanmant Sharma <rupali@tresilient.com>
+[2026-02-18 10:02:23] SMTP connecting: Host=smtp.gmail.com, Port=587, SSL=True, From=cradleitl@gmail.com
+, To=rupali@tresilient.com
+[2026-02-18 10:02:23] Subject: New Stock Increase Pending Approval - 202526/SMDAT/ADJ/1
+[2026-02-18 10:02:27] EMAIL SENT SUCCESSFULLY to rupali@tresilient.com
+[2026-02-18 10:02:28] SendRecordCreatedEmail COMPLETE
+[2026-02-18 10:10:01] SendRecordCreatedEmail START - FinYear=202526, RecType=10, RecNumber=1, DocRef=202526/SMDAT/TRN/1
+[2026-02-18 10:10:01] Mail config loaded: Host=smtp.gmail.com, Port=587, From=cradleitl@gmail.com
+, SSL=True
+[2026-02-18 10:10:01] L1 approvers found: Hanmant Sharma <rupali@tresilient.com>
+[2026-02-18 10:10:01] Sending record-created email to Hanmant Sharma <rupali@tresilient.com>
+[2026-02-18 10:10:01] SMTP connecting: Host=smtp.gmail.com, Port=587, SSL=True, From=cradleitl@gmail.com
+, To=rupali@tresilient.com
+[2026-02-18 10:10:01] Subject: New Stock Decrease Pending Approval - 202526/SMDAT/TRN/1
+[2026-02-18 10:10:06] EMAIL SENT SUCCESSFULLY to rupali@tresilient.com
+[2026-02-18 10:10:06] SendRecordCreatedEmail COMPLETE
+[2026-02-18 10:10:08] SendRecordCreatedEmail START - FinYear=202526, RecType=12, RecNumber=1, DocRef=202526/SMDAT/ADJ/1
+[2026-02-18 10:10:08] Mail config loaded: Host=smtp.gmail.com, Port=587, From=cradleitl@gmail.com
+, SSL=True
+[2026-02-18 10:10:08] L1 approvers found: Hanmant Sharma <rupali@tresilient.com>
+[2026-02-18 10:10:08] Sending record-created email to Hanmant Sharma <rupali@tresilient.com>
+[2026-02-18 10:10:08] SMTP connecting: Host=smtp.gmail.com, Port=587, SSL=True, From=cradleitl@gmail.com
+, To=rupali@tresilient.com
+[2026-02-18 10:10:08] Subject: New Stock Increase Pending Approval - 202526/SMDAT/ADJ/1
+[2026-02-18 10:10:12] EMAIL SENT SUCCESSFULLY to rupali@tresilient.com
+[2026-02-18 10:10:12] SendRecordCreatedEmail COMPLETE
+[2026-02-18 10:10:40] SendRecordCreatedEmail START - FinYear=202526, RecType=10, RecNumber=2, DocRef=202526/SMDAT/TRN/2
+[2026-02-18 10:10:40] Mail config loaded: Host=smtp.gmail.com, Port=587, From=cradleitl@gmail.com
+, SSL=True
+[2026-02-18 10:10:40] L1 approvers found: Hanmant Sharma <rupali@tresilient.com>
+[2026-02-18 10:10:40] Sending record-created email to Hanmant Sharma <rupali@tresilient.com>
+[2026-02-18 10:10:40] SMTP connecting: Host=smtp.gmail.com, Port=587, SSL=True, From=cradleitl@gmail.com
+, To=rupali@tresilient.com
+[2026-02-18 10:10:40] Subject: New Stock Decrease Pending Approval - 202526/SMDAT/TRN/2
+[2026-02-18 10:10:45] EMAIL SENT SUCCESSFULLY to rupali@tresilient.com
+[2026-02-18 10:10:45] SendRecordCreatedEmail COMPLETE
+[2026-02-18 10:10:47] SendRecordCreatedEmail START - FinYear=202526, RecType=12, RecNumber=2, DocRef=202526/SMDAT/ADJ/2
+[2026-02-18 10:10:47] Mail config loaded: Host=smtp.gmail.com, Port=587, From=cradleitl@gmail.com
+, SSL=True
+[2026-02-18 10:10:47] L1 approvers found: Hanmant Sharma <rupali@tresilient.com>
+[2026-02-18 10:10:47] Sending record-created email to Hanmant Sharma <rupali@tresilient.com>
+[2026-02-18 10:10:47] SMTP connecting: Host=smtp.gmail.com, Port=587, SSL=True, From=cradleitl@gmail.com
+, To=rupali@tresilient.com
+[2026-02-18 10:10:47] Subject: New Stock Increase Pending Approval - 202526/SMDAT/ADJ/2
+[2026-02-18 10:10:51] EMAIL SENT SUCCESSFULLY to rupali@tresilient.com
+[2026-02-18 10:10:51] SendRecordCreatedEmail COMPLETE
+[2026-02-18 10:15:22] SendRecordCreatedEmail START - FinYear=202526, RecType=10, RecNumber=1, DocRef=202526/SMDAT/TRN/1
+[2026-02-18 10:15:22] Mail config loaded: Host=smtp.gmail.com, Port=587, From=cradleitl@gmail.com
+, SSL=True
+[2026-02-18 10:15:22] L1 approvers found: Hanmant Sharma <rupali@tresilient.com>
+[2026-02-18 10:15:22] Sending record-created email to Hanmant Sharma <rupali@tresilient.com>
+[2026-02-18 10:15:22] SMTP connecting: Host=smtp.gmail.com, Port=587, SSL=True, From=cradleitl@gmail.com
+, To=rupali@tresilient.com
+[2026-02-18 10:15:22] Subject: New Stock Decrease Pending Approval - 202526/SMDAT/TRN/1
+[2026-02-18 10:15:27] EMAIL SENT SUCCESSFULLY to rupali@tresilient.com
+[2026-02-18 10:15:27] SendRecordCreatedEmail COMPLETE
+[2026-02-18 10:15:29] SendRecordCreatedEmail START - FinYear=202526, RecType=12, RecNumber=1, DocRef=202526/SMDAT/ADJ/1
+[2026-02-18 10:15:29] Mail config loaded: Host=smtp.gmail.com, Port=587, From=cradleitl@gmail.com
+, SSL=True
+[2026-02-18 10:15:29] L1 approvers found: Hanmant Sharma <rupali@tresilient.com>
+[2026-02-18 10:15:29] Sending record-created email to Hanmant Sharma <rupali@tresilient.com>
+[2026-02-18 10:15:29] SMTP connecting: Host=smtp.gmail.com, Port=587, SSL=True, From=cradleitl@gmail.com
+, To=rupali@tresilient.com
+[2026-02-18 10:15:29] Subject: New Stock Increase Pending Approval - 202526/SMDAT/ADJ/1
+[2026-02-18 10:15:34] EMAIL SENT SUCCESSFULLY to rupali@tresilient.com
+[2026-02-18 10:15:34] SendRecordCreatedEmail COMPLETE
+[2026-02-18 10:18:18] SendRecordCreatedEmail START - FinYear=202526, RecType=10, RecNumber=1, DocRef=202526/SMDAT/TRN/1
+[2026-02-18 10:18:18] Mail config loaded: Host=smtp.gmail.com, Port=587, From=cradleitl@gmail.com
+, SSL=True
+[2026-02-18 10:18:18] L1 approvers found: Hanmant Sharma <rupali@tresilient.com>
+[2026-02-18 10:18:18] Sending record-created email to Hanmant Sharma <rupali@tresilient.com>
+[2026-02-18 10:18:18] SMTP connecting: Host=smtp.gmail.com, Port=587, SSL=True, From=cradleitl@gmail.com
+, To=rupali@tresilient.com
+[2026-02-18 10:18:18] Subject: New Stock Decrease Pending Approval - 202526/SMDAT/TRN/1
+[2026-02-18 10:18:22] EMAIL SENT SUCCESSFULLY to rupali@tresilient.com
+[2026-02-18 10:18:23] SendRecordCreatedEmail COMPLETE
+[2026-02-18 10:18:24] SendRecordCreatedEmail START - FinYear=202526, RecType=12, RecNumber=1, DocRef=202526/SMDAT/ADJ/1
+[2026-02-18 10:18:24] Mail config loaded: Host=smtp.gmail.com, Port=587, From=cradleitl@gmail.com
+, SSL=True
+[2026-02-18 10:18:24] L1 approvers found: Hanmant Sharma <rupali@tresilient.com>
+[2026-02-18 10:18:24] Sending record-created email to Hanmant Sharma <rupali@tresilient.com>
+[2026-02-18 10:18:24] SMTP connecting: Host=smtp.gmail.com, Port=587, SSL=True, From=cradleitl@gmail.com
+, To=rupali@tresilient.com
+[2026-02-18 10:18:24] Subject: New Stock Increase Pending Approval - 202526/SMDAT/ADJ/1
+[2026-02-18 10:18:29] EMAIL SENT SUCCESSFULLY to rupali@tresilient.com
+[2026-02-18 10:18:29] SendRecordCreatedEmail COMPLETE
