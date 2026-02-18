@@ -50,7 +50,6 @@
                                 <tr>
                                     <th style="width: 30px;"></th>
                                     <th>Document Ref</th>
-                                    <th>Type</th>
                                     <th>Date</th>
                                     <th>Created By</th>
                                     <th>Department</th>
@@ -61,7 +60,7 @@
                             </thead>
                             <tbody id="approvalTableBody">
                                 <tr>
-                                    <td colspan="9" class="text-center py-4">
+                                    <td colspan="8" class="text-center py-4">
                                         <div class="spinner-border text-primary" role="status">
                                             <span class="visually-hidden">Loading...</span>
                                         </div>
@@ -94,7 +93,6 @@
                 </div>
                 <form id="approvalForm">
                     <input type="hidden" id="approvalFinYear" />
-                    <input type="hidden" id="approvalRecType" />
                     <input type="hidden" id="approvalRecNumber" />
                     <input type="hidden" id="approvalAction" />
 
@@ -138,19 +136,17 @@
             // Approve button click
             $(document).on('click', '.btn-approve-doc', function () {
                 var finYear = $(this).data('finyear');
-                var recType = $(this).data('rectype');
                 var recNumber = $(this).data('recnumber');
                 var docRef = $(this).data('docref');
-                openApprovalModal(finYear, recType, recNumber, docRef, 'approve');
+                openApprovalModal(finYear, recNumber, docRef, 'approve');
             });
 
             // Reject button click
             $(document).on('click', '.btn-reject-doc', function () {
                 var finYear = $(this).data('finyear');
-                var recType = $(this).data('rectype');
                 var recNumber = $(this).data('recnumber');
                 var docRef = $(this).data('docref');
-                openApprovalModal(finYear, recType, recNumber, docRef, 'reject');
+                openApprovalModal(finYear, recNumber, docRef, 'reject');
             });
 
             // Toggle detail row
@@ -186,12 +182,11 @@
 
         function showError(message) {
             var tbody = $('#approvalTableBody');
-            tbody.html('<tr><td colspan="9" class="text-center py-4 text-danger"><i class="bi bi-exclamation-triangle fs-3"></i><p class="mt-2 mb-0">' + message + '</p></td></tr>');
+            tbody.html('<tr><td colspan="8" class="text-center py-4 text-danger"><i class="bi bi-exclamation-triangle fs-3"></i><p class="mt-2 mb-0">' + message + '</p></td></tr>');
         }
 
-        function openApprovalModal(finYear, recType, recNumber, docRef, action) {
+        function openApprovalModal(finYear, recNumber, docRef, action) {
             $('#approvalFinYear').val(finYear);
-            $('#approvalRecType').val(recType);
             $('#approvalRecNumber').val(recNumber);
             $('#approvalAction').val(action);
             $('#modalDocRef').text(docRef);
@@ -242,12 +237,12 @@
             tbody.empty();
 
             if (!documents || documents.length === 0) {
-                tbody.html('<tr><td colspan="9" class="text-center py-4"><i class="bi bi-inbox fs-1 text-muted"></i><p class="mt-2 mb-0 text-muted">No stock adjustment documents found.</p></td></tr>');
+                tbody.html('<tr><td colspan="8" class="text-center py-4"><i class="bi bi-inbox fs-1 text-muted"></i><p class="mt-2 mb-0 text-muted">No stock adjustment documents found.</p></td></tr>');
                 return;
             }
 
             $.each(documents, function (index, doc) {
-                var key = doc.FinYear + '_' + doc.RecType + '_' + doc.RecNumber;
+                var key = doc.FinYear + '_' + doc.RecNumber;
 
                 // Build approval progress badges
                 var progressHtml = buildApprovalProgress(doc);
@@ -260,11 +255,11 @@
                 if (doc.CanApprove) {
                     actionsHtml =
                         '<button class="btn btn-sm btn-success btn-approve-doc me-1" ' +
-                        'data-finyear="' + doc.FinYear + '" data-rectype="' + doc.RecType + '" data-recnumber="' + doc.RecNumber + '" ' +
+                        'data-finyear="' + doc.FinYear + '" data-recnumber="' + doc.RecNumber + '" ' +
                         'data-docref="' + doc.DocumentReference + '" title="Approve at L' + currentUserLevel + '">' +
                         '<i class="bi bi-check-circle"></i> Approve</button>' +
                         '<button class="btn btn-sm btn-danger btn-reject-doc" ' +
-                        'data-finyear="' + doc.FinYear + '" data-rectype="' + doc.RecType + '" data-recnumber="' + doc.RecNumber + '" ' +
+                        'data-finyear="' + doc.FinYear + '" data-recnumber="' + doc.RecNumber + '" ' +
                         'data-docref="' + doc.DocumentReference + '" title="Reject at L' + currentUserLevel + '">' +
                         '<i class="bi bi-x-circle"></i> Reject</button>';
                 } else if (doc.NextPendingLevel === 0) {
@@ -275,15 +270,10 @@
                     actionsHtml = '<span class="text-muted fst-italic">Awaiting L' + doc.NextPendingLevel + '</span>';
                 }
 
-                // Main document row
-                var typeBadge = doc.RecType === 10
-                    ? '<span class="badge bg-warning text-dark">Decrease</span>'
-                    : '<span class="badge bg-info">Increase</span>';
-
+                // Main document row (merged - no Type column)
                 var row = '<tr class="doc-row" data-key="' + key + '">' +
                     '<td class="text-center"><i class="bi bi-chevron-right toggle-icon"></i></td>' +
                     '<td><strong>' + doc.DocumentReference + '</strong></td>' +
-                    '<td>' + typeBadge + '</td>' +
                     '<td>' + formatDate(doc.Date) + '</td>' +
                     '<td>' + (doc.CreatedBy || '') + '</td>' +
                     '<td>' + (doc.Department || '') + '</td>' +
@@ -294,7 +284,7 @@
 
                 // Detail row (hidden by default)
                 var detailRow = '<tr class="detail-row" id="detail-' + key + '" style="display:none;">' +
-                    '<td colspan="9">' + buildDetailContent(doc) + '</td>' +
+                    '<td colspan="8">' + buildDetailContent(doc) + '</td>' +
                     '</tr>';
 
                 tbody.append(row);
@@ -384,25 +374,28 @@
             if (doc.LineItems && doc.LineItems.length > 0) {
                 html += '<h6 class="mb-2"><i class="bi bi-list-ul me-1"></i>Line Items</h6>';
                 html += '<table class="table table-sm table-bordered line-items-table">';
-                html += '<thead><tr><th>#</th><th>Item Code</th><th>Description</th><th>From Location</th><th>To Location</th><th>Quantity</th><th class="text-end">Cost</th><th class="text-end">Amount</th></tr></thead>';
+                html += '<thead><tr><th>#</th><th>Type</th><th>Item Code</th><th>Description</th><th>Location</th><th>Quantity</th><th class="text-end">Cost</th><th class="text-end">Amount</th></tr></thead>';
                 html += '<tbody>';
                 var totalAmount = 0;
                 $.each(doc.LineItems, function (i, item) {
                     var amt = parseFloat(item.Amount || 0);
                     totalAmount += amt;
+                    var typeBadge = item.RecType === 10
+                        ? '<span class="badge bg-warning text-dark">Decrease</span>'
+                        : '<span class="badge bg-info">Increase</span>';
                     html += '<tr>' +
                         '<td>' + item.Sno + '</td>' +
+                        '<td>' + typeBadge + '</td>' +
                         '<td>' + item.ItemCode + '</td>' +
                         '<td>' + (item.ItemDesc || '') + '</td>' +
-                        '<td>' + item.FromLocation + ' - ' + (item.FromLocationName || '') + '</td>' +
-                        '<td>' + item.ToLocation + ' - ' + (item.ToLocationName || '') + '</td>' +
+                        '<td>' + (item.RecType === 12 ? item.ToLocation : item.FromLocation) + ' - ' + (item.RecType === 12 ? (item.ToLocationName || '') : (item.FromLocationName || '')) + '</td>' +
                         '<td>' + item.Quantity + '</td>' +
                         '<td class="text-end">' + parseFloat(item.Cost || 0).toFixed(2) + '</td>' +
                         '<td class="text-end">' + amt.toFixed(2) + '</td>' +
                         '</tr>';
                 });
                 html += '</tbody>';
-                html += '<tfoot><tr><td colspan="7" class="text-end fw-bold">Total Amount:</td><td class="text-end fw-bold">' + totalAmount.toFixed(2) + '</td></tr></tfoot>';
+                html += '<tfoot><tr><td colspan="8" class="text-end fw-bold">Total Amount:</td><td class="text-end fw-bold">' + totalAmount.toFixed(2) + '</td></tr></tfoot>';
                 html += '</table>';
             }
 
@@ -412,7 +405,6 @@
 
         function processApproval(action) {
             var finYear = $('#approvalFinYear').val();
-            var recType = $('#approvalRecType').val();
             var recNumber = $('#approvalRecNumber').val();
             var remarks = $('#approvalRemarks').val();
 
@@ -430,7 +422,6 @@
                 type: 'POST',
                 data: {
                     finYear: finYear,
-                    recType: recType,
                     recNumber: recNumber,
                     action: action,
                     remarks: remarks
@@ -443,9 +434,9 @@
 
                     if (response.success) {
                         if (response.isFullyApproved && response.sageResponse) {
-                            showSageResponseModal(response.sageResponse, response.message);
+                            showSageResponseModal([response.sageResponse], response.message);
                         } else if (response.sageTransferResponse) {
-                            showSageResponseModal(response.sageTransferResponse, response.message);
+                            showSageResponseModal([response.sageTransferResponse], response.message);
                         } else {
                             showResultAlert(response.message, true);
                             loadPendingApprovals();
@@ -464,42 +455,46 @@
             });
         }
 
-        function showSageResponseModal(sageData, message) {
-            var isSuccess = sageData.isSuccess === true;
-            var statusClass = isSuccess ? 'success' : 'danger';
-            var statusIcon = isSuccess ? 'bi-check-circle-fill' : 'bi-x-circle-fill';
-            var alertClass = isSuccess ? 'alert-success' : 'alert-danger';
-            var alertIcon = isSuccess ? 'bi-database-check' : 'bi-exclamation-triangle-fill';
+        function showSageResponseModal(sageDataArray, message) {
+            var allSuccess = sageDataArray.every(function (s) { return s.isSuccess === true; });
+            var alertClass = allSuccess ? 'alert-success' : 'alert-danger';
+            var alertIcon = allSuccess ? 'bi-database-check' : 'bi-exclamation-triangle-fill';
 
-            var docInfo = sageData.docNum || sageData.transferNumber || '';
-            var cardTitle = docInfo ? docInfo : (isSuccess ? 'Success' : 'Error');
+            var cardsHtml = '';
+            $.each(sageDataArray, function (idx, sageData) {
+                var isSuccess = sageData.isSuccess === true;
+                var statusClass = isSuccess ? 'success' : 'danger';
+                var statusIcon = isSuccess ? 'bi-check-circle-fill' : 'bi-x-circle-fill';
 
-            var cardHtml = '<div class="card mb-3 border-' + statusClass + ' border-2">' +
-                '<div class="card-header bg-' + statusClass + ' bg-opacity-10 d-flex justify-content-between align-items-center">' +
-                '<span><i class="bi ' + statusIcon + ' text-' + statusClass + ' me-2"></i><strong>' + escapeHtml(cardTitle) + '</strong></span>' +
-                '<span class="badge bg-' + statusClass + '">' + escapeHtml(String(sageData.status || 'Unknown')) + '</span></div>' +
-                '<div class="card-body"><p class="mb-2"><strong>Message:</strong> ' + escapeHtml(sageData.message || 'No message') + '</p>';
+                var cardTitle = (sageData.recTypeName ? sageData.recTypeName + ' - ' : '') + (sageData.docNum || sageData.transferNumber || (isSuccess ? 'Success' : 'Error'));
 
-            if (sageData.docNum) {
-                cardHtml += '<p class="mb-2"><strong>Doc #:</strong> ' + escapeHtml(sageData.docNum) + '</p>';
-            }
-            if (sageData.transferNumber) {
-                cardHtml += '<p class="mb-2"><strong>Transfer #:</strong> ' + escapeHtml(sageData.transferNumber) + '</p>';
-            }
+                cardsHtml += '<div class="card mb-3 border-' + statusClass + ' border-2">' +
+                    '<div class="card-header bg-' + statusClass + ' bg-opacity-10 d-flex justify-content-between align-items-center">' +
+                    '<span><i class="bi ' + statusIcon + ' text-' + statusClass + ' me-2"></i><strong>' + escapeHtml(cardTitle) + '</strong></span>' +
+                    '<span class="badge bg-' + statusClass + '">' + escapeHtml(String(sageData.status || 'Unknown')) + '</span></div>' +
+                    '<div class="card-body"><p class="mb-2"><strong>Message:</strong> ' + escapeHtml(sageData.message || 'No message') + '</p>';
 
-            cardHtml += '<div class="mt-2">' +
-                '<button class="btn btn-sm btn-outline-primary me-2" type="button" data-bs-toggle="collapse" data-bs-target="#sageReq0"><i class="bi bi-arrow-up-circle me-1"></i>View Request</button>' +
-                '<button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#sageRes0"><i class="bi bi-arrow-down-circle me-1"></i>View Response</button>' +
-                '<div class="collapse mt-2" id="sageReq0"><pre class="bg-dark text-light p-3 rounded" style="max-height:300px;overflow-y:auto;font-size:0.85rem;white-space:pre-wrap;">' + escapeHtml(formatJson(sageData.rawRequest) || 'No request data') + '</pre></div>' +
-                '<div class="collapse mt-2" id="sageRes0"><pre class="bg-dark text-light p-3 rounded" style="max-height:300px;overflow-y:auto;font-size:0.85rem;white-space:pre-wrap;">' + escapeHtml(formatJson(sageData.rawResponse) || 'No response data') + '</pre></div>' +
-                '</div></div></div>';
+                if (sageData.docNum) {
+                    cardsHtml += '<p class="mb-2"><strong>Doc #:</strong> ' + escapeHtml(sageData.docNum) + '</p>';
+                }
+                if (sageData.transferNumber) {
+                    cardsHtml += '<p class="mb-2"><strong>Transfer #:</strong> ' + escapeHtml(sageData.transferNumber) + '</p>';
+                }
+
+                cardsHtml += '<div class="mt-2">' +
+                    '<button class="btn btn-sm btn-outline-primary me-2" type="button" data-bs-toggle="collapse" data-bs-target="#sageReq' + idx + '"><i class="bi bi-arrow-up-circle me-1"></i>View Request</button>' +
+                    '<button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#sageRes' + idx + '"><i class="bi bi-arrow-down-circle me-1"></i>View Response</button>' +
+                    '<div class="collapse mt-2" id="sageReq' + idx + '"><pre class="bg-dark text-light p-3 rounded" style="max-height:300px;overflow-y:auto;font-size:0.85rem;white-space:pre-wrap;">' + escapeHtml(formatJson(sageData.rawRequest) || 'No request data') + '</pre></div>' +
+                    '<div class="collapse mt-2" id="sageRes' + idx + '"><pre class="bg-dark text-light p-3 rounded" style="max-height:300px;overflow-y:auto;font-size:0.85rem;white-space:pre-wrap;">' + escapeHtml(formatJson(sageData.rawResponse) || 'No response data') + '</pre></div>' +
+                    '</div></div></div>';
+            });
 
             var modalHtml = '<div class="modal fade" id="sageResponseModal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false">' +
                 '<div class="modal-dialog modal-lg"><div class="modal-content">' +
                 '<div class="modal-header bg-info text-white"><h5 class="modal-title"><i class="bi bi-cloud-arrow-up me-2"></i>Transaction Results</h5></div>' +
                 '<div class="modal-body p-4">' +
                 '<div class="alert ' + alertClass + ' mb-4"><i class="bi ' + alertIcon + ' me-2"></i>' + escapeHtml(message) + '</div>' +
-                '<h6 class="fw-bold mb-3">Results</h6>' + cardHtml +
+                '<h6 class="fw-bold mb-3">Results (' + sageDataArray.length + ' call' + (sageDataArray.length > 1 ? 's' : '') + ')</h6>' + cardsHtml +
                 '</div><div class="modal-footer"><button type="button" class="btn btn-primary" id="btnCloseSageModal"><i class="bi bi-check-lg me-2"></i>OK</button></div>' +
                 '</div></div></div>';
 

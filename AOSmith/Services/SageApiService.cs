@@ -13,7 +13,7 @@ namespace AOSmith.Services
     public class SageApiService
     {
         private const string SageTransferApiUrl = "https://sagetest.aosmith.in/Sage300.WebAPI2024/api/TransferEntry";
-        private const string SageAdjustmentApiUrl = "https://sagetest.aosmith.in/Sage300.WebAPI2024/api/AdjustmentEntry";
+        private const string SageAdjustmentApiUrl = "https://sagetest.aosmith.in/Sage300.WebAPI2024/api/MultiLineAdjustmentEntry";
         private const string SageItemsApiUrl = "https://sagetest.aosmith.in/Sage300.WebAPI2024/api/icitems";
         private const string SageItemSearchApiUrl = "https://sagetest.aosmith.in/Sage300.WebAPI2024/api/ItemSearch";
         private const string SageLocationsApiUrl = "https://sagetest.aosmith.in/Sage300.WebAPI2024/api/Locations";
@@ -83,6 +83,13 @@ namespace AOSmith.Services
             return result?.Value ?? "UNK";
         }
 
+        private async Task<string> GetRecNumberPrefixAsync()
+        {
+            var sql = "SELECT TOP 1 RTRIM(APP_RecNumber_Prefix) AS Value FROM APP_Options ORDER BY APP_ID";
+            var result = await _dbHelper.QuerySingleAsync<StringResult>(sql);
+            return result?.Value ?? "SAGE";
+        }
+
         // ========== Transfer Entry ==========
 
         public async Task<SageTransferEntryResponse> SendTransferEntryAsync(
@@ -98,8 +105,9 @@ namespace AOSmith.Services
             {
                 var creds = await GetSageCredentialsAsync(companyName);
                 var recName = await GetRecTypeNameAsync(recType);
+                var prefix = await GetRecNumberPrefixAsync();
 
-                var request = BuildRequest(creds, companyName, finYear, recName, lineItems, transactionDate, recNumber, recType);
+                var request = BuildRequest(creds, companyName, finYear, recName, prefix, lineItems, transactionDate, recNumber, recType);
                 jsonPayload = JsonConvert.SerializeObject(request, Formatting.Indented);
 
                 var content = new StringContent(jsonPayload, Encoding.UTF8, "application/json");
@@ -163,6 +171,7 @@ namespace AOSmith.Services
             string companyName,
             int finYear,
             string recName,
+            string prefix,
             List<StockAdjustmentLineItem> lineItems,
             DateTime transactionDate,
             int recNumber,
@@ -171,6 +180,7 @@ namespace AOSmith.Services
             var transDateStr = transactionDate.ToString("yyyy-MM-ddTHH:mm:ss");
             var expArDateStr = transactionDate.AddMonths(1).ToString("yyyy-MM-ddTHH:mm:ss");
             var recTypeName2 = recType == 12 ? "INCREASE" : recType == 14 ? "REVERSAL" : "DECREASE";
+            var docNumPrefix = recType == 14 ? recName : prefix;
             var docReference = $"{finYear}/{companyName}/{recName}/{recNumber}";
 
             var request = new SageTransferEntryRequest
@@ -178,7 +188,7 @@ namespace AOSmith.Services
                 UserId = creds.UserId,
                 Password = creds.Password,
                 CompanyId = creds.CompanyId,
-                DocNum = $"{recName}{companyName}{recNumber.ToString().PadLeft(6, '0')}",
+                DocNum = $"{docNumPrefix}{companyName}{recNumber.ToString().PadLeft(6, '0')}",
                 Reference = docReference,
                 TransDate = transDateStr,
                 ExpArDate = expArDateStr,
@@ -206,17 +216,14 @@ namespace AOSmith.Services
             int finYear,
             List<ApprovalLineItem> lineItems,
             DateTime transactionDate,
-            int recNumber,
-            int recType,
-            string location)
+            int recNumber)
         {
             string jsonPayload = "";
             try
             {
                 var creds = await GetSageCredentialsAsync(companyName);
-                var recName = await GetRecTypeNameAsync(recType);
 
-                var request = BuildAdjustmentRequest(creds, companyName, finYear, recName, lineItems, transactionDate, recNumber, location);
+                var request = BuildAdjustmentRequest(creds, companyName, finYear, lineItems, transactionDate, recNumber);
                 jsonPayload = JsonConvert.SerializeObject(request, Formatting.Indented);
 
                 var content = new StringContent(jsonPayload, Encoding.UTF8, "application/json");
@@ -279,33 +286,32 @@ namespace AOSmith.Services
             SageCredentials creds,
             string companyName,
             int finYear,
-            string recName,
             List<ApprovalLineItem> lineItems,
             DateTime transactionDate,
-            int recNumber,
-            string location)
+            int recNumber)
         {
             var transDateStr = transactionDate.ToString("yyyy-MM-ddTHH:mm:ss");
-            var docReference = $"{finYear}/{companyName}/{recName}/{recNumber}";
+            var docReference = $"{finYear}/{companyName}/ADJ/{recNumber}";
 
             var request = new SageAdjustmentEntryRequest
             {
                 UserId = creds.UserId,
                 Password = creds.Password,
                 CompanyId = creds.CompanyId,
-                DocNum = $"{recName}{companyName}{recNumber.ToString().PadLeft(6, '0')}",
+                DocNum = $"ADJ{companyName}{recNumber.ToString().PadLeft(6, '0')}",
                 Reference = docReference,
-                Location = location?.Trim(),
                 TransDate = transDateStr,
-                HdrDesc = $"Stock Increase adjustment #{recNumber} - Approved",
-                TransType = 5,
-                AdjHeaderOptFields = new List<SageOptField>(),
+                HdrDesc = $"Stock adjustment #{recNumber} - Approved",
+                AdjustmentHeaderOptFields = new List<SageOptField>(),
                 Items = lineItems.Select(item => new SageAdjustmentItem
                 {
+                    AdjDetailOptFields = new List<SageOptField>(),
                     ItemNo = item.ItemCode?.Trim(),
+                    Location = item.RecType == 12 ? item.ToLocation?.Trim() : item.FromLocation?.Trim(),
+                    WoffAcct = "",
                     Quantity = item.Quantity,
                     ExtCost = item.Cost * item.Quantity,
-                    AdjDetailOptFields = new List<SageOptField>()
+                    TransType = item.RecType == 12 ? 5 : 6
                 }).ToList()
             };
 

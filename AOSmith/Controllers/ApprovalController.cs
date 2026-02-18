@@ -188,50 +188,79 @@ namespace AOSmith.Controllers
                 // Resolve item and location names from Sage API
                 await ResolveNamesFromSageApi(companyName, lineItems);
 
-                // 4. Group everything together
-                var result = documents.Select(doc => new
-                {
-                    doc.FinYear,
-                    doc.RecType,
-                    doc.RecNumber,
-                    doc.DocumentReference,
-                    doc.Date,
-                    doc.CreatedBy,
-                    doc.Department,
-                    doc.TotalLevels,
-                    doc.ApprovedCount,
-                    doc.RejectedCount,
-                    doc.NextPendingLevel,
-                    // User can approve if: their level == next pending level
-                    CanApprove = doc.NextPendingLevel > 0 && doc.NextPendingLevel == userApprovalLevel,
-                    doc.RecTypeName,
-                    Levels = levels?.Where(l => l.FinYear == doc.FinYear && l.RecType == doc.RecType && l.RecNumber == doc.RecNumber)
-                        .OrderBy(l => l.Level)
-                        .Select(l => new
+                // 4. Group by (FinYear, RecNumber) to merge RecType 10 and 12 into one row
+                var result = documents
+                    .GroupBy(doc => new { doc.FinYear, doc.RecNumber })
+                    .Select(g =>
+                    {
+                        var first = g.First();
+                        var allRecTypes = g.Select(d => d.RecType).Distinct().OrderBy(r => r).ToList();
+
+                        // Merge approval counts across RecTypes
+                        var totalLevels = g.Sum(d => d.TotalLevels);
+                        var approvedCount = g.Sum(d => d.ApprovedCount);
+                        var rejectedCount = g.Sum(d => d.RejectedCount);
+
+                        // NextPendingLevel: if any rejected → -1; if all fully approved → 0; else min pending
+                        int nextPending;
+                        if (g.Any(d => d.NextPendingLevel == -1))
+                            nextPending = -1;
+                        else if (g.All(d => d.NextPendingLevel == 0))
+                            nextPending = 0;
+                        else
+                            nextPending = g.Where(d => d.NextPendingLevel > 0).Any()
+                                ? g.Where(d => d.NextPendingLevel > 0).Min(d => d.NextPendingLevel)
+                                : 0;
+
+                        // Document reference without RecType name
+                        var docRef = $"{first.FinYear}/{companyName}/{first.RecNumber}";
+
+                        return new
                         {
-                            l.Level,
-                            l.StatusCode,
-                            l.StatusName,
-                            l.ApproverName,
-                            l.ApprovalDate,
-                            l.Comments
-                        }).ToList(),
-                    LineItems = lineItems?.Where(li => li.FinYear == doc.FinYear && li.RecType == doc.RecType && li.RecNumber == doc.RecNumber)
-                        .OrderBy(li => li.Sno)
-                        .Select(li => new
-                        {
-                            li.Sno,
-                            li.ItemCode,
-                            li.ItemDesc,
-                            li.FromLocation,
-                            li.FromLocationName,
-                            li.ToLocation,
-                            li.ToLocationName,
-                            li.Quantity,
-                            li.Cost,
-                            li.Amount
-                        }).ToList()
-                }).ToList();
+                            first.FinYear,
+                            first.RecNumber,
+                            DocumentReference = docRef,
+                            first.Date,
+                            first.CreatedBy,
+                            first.Department,
+                            TotalLevels = totalLevels,
+                            ApprovedCount = approvedCount,
+                            RejectedCount = rejectedCount,
+                            NextPendingLevel = nextPending,
+                            CanApprove = nextPending > 0 && nextPending == userApprovalLevel,
+                            RecTypes = allRecTypes,
+                            // Show levels from first RecType (they are approved together so should be in sync)
+                            Levels = levels?.Where(l => l.FinYear == first.FinYear && l.RecType == first.RecType && l.RecNumber == first.RecNumber)
+                                .OrderBy(l => l.Level)
+                                .Select(l => new
+                                {
+                                    l.Level,
+                                    l.StatusCode,
+                                    l.StatusName,
+                                    l.ApproverName,
+                                    l.ApprovalDate,
+                                    l.Comments
+                                }).ToList(),
+                            // Combine line items from ALL RecTypes, include RecType for UI grouping
+                            LineItems = lineItems?.Where(li => li.FinYear == first.FinYear && li.RecNumber == first.RecNumber)
+                                .OrderBy(li => li.RecType).ThenBy(li => li.Sno)
+                                .Select(li => new
+                                {
+                                    li.RecType,
+                                    RecTypeName = li.RecType == 10 ? "Decrease" : "Increase",
+                                    li.Sno,
+                                    li.ItemCode,
+                                    li.ItemDesc,
+                                    li.FromLocation,
+                                    li.FromLocationName,
+                                    li.ToLocation,
+                                    li.ToLocationName,
+                                    li.Quantity,
+                                    li.Cost,
+                                    li.Amount
+                                }).ToList()
+                        };
+                    }).ToList();
 
                 return Json(new { success = true, data = result, userApprovalLevel = userApprovalLevel }, JsonRequestBehavior.AllowGet);
             }
@@ -241,9 +270,9 @@ namespace AOSmith.Controllers
             }
         }
 
-        // POST: ProcessApproval
+        // POST: ProcessApproval (processes ALL RecTypes 10 & 12 for the given RecNumber)
         [HttpPost]
-        public async Task<JsonResult> ProcessApproval(int finYear, int recType, int recNumber, string action, string remarks)
+        public async Task<JsonResult> ProcessApproval(int finYear, int recNumber, string action, string remarks)
         {
             try
             {
@@ -257,7 +286,7 @@ namespace AOSmith.Controllers
                     return Json(new { success = false, message = "You do not have permission to process approvals." });
                 }
 
-                // Validate: check that all previous levels are Approved before this user's level
+                // Validate: check that all previous levels are Approved before this user's level (across ALL RecTypes)
                 if (userApprovalLevel > 1)
                 {
                     var countQuery = @"
@@ -265,7 +294,7 @@ namespace AOSmith.Controllers
                         FROM Stock_Adjustment_Approval
                         WHERE Approval_Company_Name = @CompanyName
                         AND Approval_FIN_Year = @FinYear
-                        AND Approval_REC_Type = @RecType
+                        AND Approval_REC_Type IN (10, 12)
                         AND Approval_REC_Number = @RecNumber
                         AND Approval_Level < @UserLevel
                         AND Approval_Status != @ApprovedStatus";
@@ -274,7 +303,6 @@ namespace AOSmith.Controllers
                     {
                         { "@CompanyName", companyName },
                         { "@FinYear", finYear },
-                        { "@RecType", recType },
                         { "@RecNumber", recNumber },
                         { "@UserLevel", userApprovalLevel },
                         { "@ApprovedStatus", ApprovalStatusConstants.Approved }
@@ -288,38 +316,34 @@ namespace AOSmith.Controllers
                     }
                 }
 
-                // Validate: check the current level is still pending
+                // Validate: check the current level is still pending (for ALL RecTypes)
                 var statusCheckQuery = @"
-                    SELECT Approval_Status AS Value
+                    SELECT COUNT(*) AS Value
                     FROM Stock_Adjustment_Approval
                     WHERE Approval_Company_Name = @CompanyName
                     AND Approval_FIN_Year = @FinYear
-                    AND Approval_REC_Type = @RecType
+                    AND Approval_REC_Type IN (10, 12)
                     AND Approval_REC_Number = @RecNumber
-                    AND Approval_Level = @UserLevel";
+                    AND Approval_Level = @UserLevel
+                    AND Approval_Status != @PendingStatus";
 
                 var statusCheckParams = new Dictionary<string, object>
                 {
                     { "@CompanyName", companyName },
                     { "@FinYear", finYear },
-                    { "@RecType", recType },
                     { "@RecNumber", recNumber },
-                    { "@UserLevel", userApprovalLevel }
+                    { "@UserLevel", userApprovalLevel },
+                    { "@PendingStatus", ApprovalStatusConstants.Pending }
                 };
 
-                var currentStatus = await _databaseHelper.QuerySingleAsync<CountResult>(statusCheckQuery, statusCheckParams);
+                var alreadyProcessedCount = await _databaseHelper.QuerySingleAsync<CountResult>(statusCheckQuery, statusCheckParams);
 
-                if (currentStatus == null)
-                {
-                    return Json(new { success = false, message = "Approval record not found for your level." });
-                }
-
-                if (currentStatus.Value != ApprovalStatusConstants.Pending)
+                if (alreadyProcessedCount != null && alreadyProcessedCount.Value > 0)
                 {
                     return Json(new { success = false, message = "This approval level has already been processed." });
                 }
 
-                // Update the approval record
+                // Update approval records for ALL RecTypes at this level
                 int newStatus = action.ToLower() == "approve"
                     ? ApprovalStatusConstants.Approved
                     : ApprovalStatusConstants.Rejected;
@@ -332,7 +356,7 @@ namespace AOSmith.Controllers
                         Approval_Comments = @Comments
                     WHERE Approval_Company_Name = @CompanyName
                     AND Approval_FIN_Year = @FinYear
-                    AND Approval_REC_Type = @RecType
+                    AND Approval_REC_Type IN (10, 12)
                     AND Approval_REC_Number = @RecNumber
                     AND Approval_Level = @UserLevel";
 
@@ -344,7 +368,6 @@ namespace AOSmith.Controllers
                     { "@Comments", remarks ?? "" },
                     { "@CompanyName", companyName },
                     { "@FinYear", finYear },
-                    { "@RecType", recType },
                     { "@RecNumber", recNumber },
                     { "@UserLevel", userApprovalLevel }
                 };
@@ -356,156 +379,153 @@ namespace AOSmith.Controllers
                     ? $"Document approved at {levelLabel} successfully."
                     : $"Document rejected at {levelLabel}.";
 
-                // On rejection → create reversal records (RecType 14) with swapped locations via SP
+                // On rejection → create reversal records (RecType 14) for RecType 10 (which was sent to Transfer API on save)
                 string reversalDocRef = null;
                 SageTransferEntryResponse sageTransferResponse = null;
                 if (action.ToLower() == "reject")
                 {
-                    var reversalParams = new List<System.Data.SqlClient.SqlParameter>
+                    // Check if RecType 10 exists for this RecNumber
+                    var hasRecType10Query = @"
+                        SELECT COUNT(*) AS Value FROM Stock_Adjustment
+                        WHERE Stock_Company_Name = @CompanyName AND Stock_FIN_Year = @FinYear
+                        AND Stock_REC_Type = 10 AND Stock_REC_Number = @RecNumber";
+                    var hasRecType10Params = new Dictionary<string, object>
                     {
-                        new System.Data.SqlClient.SqlParameter("@CompanyName", System.Data.SqlDbType.VarChar, 10) { Value = companyName },
-                        new System.Data.SqlClient.SqlParameter("@OriginalFinYear", System.Data.SqlDbType.Int) { Value = finYear },
-                        new System.Data.SqlClient.SqlParameter("@OriginalRecType", System.Data.SqlDbType.Int) { Value = recType },
-                        new System.Data.SqlClient.SqlParameter("@OriginalRecNumber", System.Data.SqlDbType.Int) { Value = recNumber },
-                        new System.Data.SqlClient.SqlParameter("@Session_ID", System.Data.SqlDbType.Int) { Value = userId }
+                        { "@CompanyName", companyName }, { "@FinYear", finYear }, { "@RecNumber", recNumber }
                     };
+                    var hasRecType10 = await _databaseHelper.QuerySingleAsync<CountResult>(hasRecType10Query, hasRecType10Params);
 
-                    var reversalResult = await _databaseHelper.ExecuteStoredProcedureWithOutputsAsync(
-                        "dbo.StockAdjustment_Reversal", reversalParams);
-
-                    if (reversalResult.ResultVal == 1)
+                    if (hasRecType10 != null && hasRecType10.Value > 0)
                     {
-                        reversalDocRef = reversalResult.ResultMessage;
-                        message += $" {reversalResult.ResultMessage}";
-
-                        // Extract the new reversal RecNumber from the ResultMessage
-                        // Format: "Reversal entry 202526/STRV/1 created for 202526/STIN/1."
-                        int reversalRecNumber = ExtractReversalRecNumber(reversalResult.ResultMessage);
-
-                        if (reversalRecNumber > 0)
+                        var reversalParams = new List<System.Data.SqlClient.SqlParameter>
                         {
-                            // Fetch the reversal line items (RecType 14) from DB
-                            var reversalLineItemsQuery = @"
-                                SELECT
-                                    sa.Stock_REC_SNO AS StockRecSno,
-                                    sa.Stock_REC_Type AS RecType,
-                                    RTRIM(sa.Stock_From_Location) AS FromLocation,
-                                    RTRIM(sa.Stock_To_Location) AS ToLocation,
-                                    RTRIM(sa.Stock_Item_Code) AS ItemCode,
-                                    '' AS ItemDescription,
-                                    sa.Stock_Qty AS Qty
-                                FROM Stock_Adjustment sa
-                                WHERE sa.Stock_Company_Name = @CompanyName
-                                AND sa.Stock_FIN_Year = @FinYear
-                                AND sa.Stock_REC_Type = 14
-                                AND sa.Stock_REC_Number = @RecNumber
-                                ORDER BY sa.Stock_REC_SNO";
+                            new System.Data.SqlClient.SqlParameter("@CompanyName", System.Data.SqlDbType.VarChar, 10) { Value = companyName },
+                            new System.Data.SqlClient.SqlParameter("@OriginalFinYear", System.Data.SqlDbType.Int) { Value = finYear },
+                            new System.Data.SqlClient.SqlParameter("@OriginalRecType", System.Data.SqlDbType.Int) { Value = 10 },
+                            new System.Data.SqlClient.SqlParameter("@OriginalRecNumber", System.Data.SqlDbType.Int) { Value = recNumber },
+                            new System.Data.SqlClient.SqlParameter("@Session_ID", System.Data.SqlDbType.Int) { Value = userId }
+                        };
 
-                            var reversalLineParams = new Dictionary<string, object>
+                        var reversalResult = await _databaseHelper.ExecuteStoredProcedureWithOutputsAsync(
+                            "dbo.StockAdjustment_Reversal", reversalParams);
+
+                        if (reversalResult.ResultVal == 1)
+                        {
+                            reversalDocRef = reversalResult.ResultMessage;
+                            message += $" {reversalResult.ResultMessage}";
+
+                            int reversalRecNumber = ExtractReversalRecNumber(reversalResult.ResultMessage);
+
+                            if (reversalRecNumber > 0)
                             {
-                                { "@CompanyName", companyName },
-                                { "@FinYear", finYear },
-                                { "@RecNumber", reversalRecNumber }
-                            };
+                                var reversalLineItemsQuery = @"
+                                    SELECT
+                                        sa.Stock_REC_SNO AS StockRecSno,
+                                        sa.Stock_REC_Type AS RecType,
+                                        RTRIM(sa.Stock_From_Location) AS FromLocation,
+                                        RTRIM(sa.Stock_To_Location) AS ToLocation,
+                                        RTRIM(sa.Stock_Item_Code) AS ItemCode,
+                                        '' AS ItemDescription,
+                                        sa.Stock_Qty AS Qty
+                                    FROM Stock_Adjustment sa
+                                    WHERE sa.Stock_Company_Name = @CompanyName
+                                    AND sa.Stock_FIN_Year = @FinYear
+                                    AND sa.Stock_REC_Type = 14
+                                    AND sa.Stock_REC_Number = @RecNumber
+                                    ORDER BY sa.Stock_REC_SNO";
 
-                            var reversalLineItems = await _databaseHelper.QueryAsync<StockAdjustmentLineItem>(
-                                reversalLineItemsQuery, reversalLineParams);
-
-                            if (reversalLineItems != null && reversalLineItems.Any())
-                            {
-                                // Get the transaction date from the reversal records
-                                var reversalDateQuery = @"
-                                    SELECT TOP 1 Stock_Date AS Value
-                                    FROM Stock_Adjustment
-                                    WHERE Stock_Company_Name = @CompanyName
-                                    AND Stock_FIN_Year = @FinYear
-                                    AND Stock_REC_Type = 14
-                                    AND Stock_REC_Number = @RecNumber";
-
-                                var reversalDateRow = await _databaseHelper.QuerySingleAsync<DateResult>(
-                                    reversalDateQuery, reversalLineParams);
-                                var reversalTransDate = reversalDateRow?.Value ?? DateTime.Now;
-
-                                // Send reversal data to Sage Transfer API
-                                sageTransferResponse = await _sageService.SendTransferEntryAsync(
-                                    companyName, finYear, reversalLineItems, reversalTransDate, reversalRecNumber, 14);
-
-                                if (sageTransferResponse != null && sageTransferResponse.IsSuccess)
+                                var reversalLineParams = new Dictionary<string, object>
                                 {
-                                    // Mark reversal records as sent to Sage
-                                    var reversalSageSentQuery = @"
-                                        UPDATE Stock_Adjustment
-                                        SET Stock_Sage_Data_Sent = 1,
-                                            Stock_Sage_Sent_Date = GETDATE(),
-                                            Stock_Sage_Transaction_Number = @DocNum
+                                    { "@CompanyName", companyName },
+                                    { "@FinYear", finYear },
+                                    { "@RecNumber", reversalRecNumber }
+                                };
+
+                                var reversalLineItems = await _databaseHelper.QueryAsync<StockAdjustmentLineItem>(
+                                    reversalLineItemsQuery, reversalLineParams);
+
+                                if (reversalLineItems != null && reversalLineItems.Any())
+                                {
+                                    var reversalDateQuery = @"
+                                        SELECT TOP 1 Stock_Date AS Value
+                                        FROM Stock_Adjustment
                                         WHERE Stock_Company_Name = @CompanyName
                                         AND Stock_FIN_Year = @FinYear
                                         AND Stock_REC_Type = 14
                                         AND Stock_REC_Number = @RecNumber";
 
-                                    var reversalSageParams = new Dictionary<string, object>
-                                    {
-                                        { "@DocNum", sageTransferResponse.DocNum ?? "" },
-                                        { "@CompanyName", companyName },
-                                        { "@FinYear", finYear },
-                                        { "@RecNumber", reversalRecNumber }
-                                    };
-                                    await _databaseHelper.ExecuteNonQueryAsync(reversalSageSentQuery, reversalSageParams);
-                                    message += $" Sage Transfer API called successfully.";
-                                }
-                                else
-                                {
-                                    // Sage failed → rollback reversal records from DB
-                                    var rollbackReversalQuery = @"
-                                        DELETE FROM Stock_Adjustment
-                                        WHERE Stock_Company_Name = @CompanyName
-                                        AND Stock_FIN_Year = @FinYear
-                                        AND Stock_REC_Type = 14
-                                        AND Stock_REC_Number = @RecNumber";
+                                    var reversalDateRow = await _databaseHelper.QuerySingleAsync<DateResult>(
+                                        reversalDateQuery, reversalLineParams);
+                                    var reversalTransDate = reversalDateRow?.Value ?? DateTime.Now;
 
-                                    var rollbackReversalParams = new Dictionary<string, object>
+                                    sageTransferResponse = await _sageService.SendTransferEntryAsync(
+                                        companyName, finYear, reversalLineItems, reversalTransDate, reversalRecNumber, 14);
+
+                                    if (sageTransferResponse != null && sageTransferResponse.IsSuccess)
                                     {
-                                        { "@CompanyName", companyName },
-                                        { "@FinYear", finYear },
-                                        { "@RecNumber", reversalRecNumber }
-                                    };
-                                    await _databaseHelper.ExecuteNonQueryAsync(rollbackReversalQuery, rollbackReversalParams);
-                                    var transferErrors = sageTransferResponse?.Errors != null && sageTransferResponse.Errors.Count > 0
-                                        ? string.Join("; ", sageTransferResponse.Errors)
-                                        : sageTransferResponse?.Message ?? "Unknown Sage error";
-                                    message += $" Sage Transfer API failed: {transferErrors}. Reversal records rolled back.";
+                                        var reversalSageSentQuery = @"
+                                            UPDATE Stock_Adjustment
+                                            SET Stock_Sage_Data_Sent = 1,
+                                                Stock_Sage_Sent_Date = GETDATE(),
+                                                Stock_Sage_Transaction_Number = @DocNum
+                                            WHERE Stock_Company_Name = @CompanyName
+                                            AND Stock_FIN_Year = @FinYear
+                                            AND Stock_REC_Type = 14
+                                            AND Stock_REC_Number = @RecNumber";
+
+                                        var reversalSageParams = new Dictionary<string, object>
+                                        {
+                                            { "@DocNum", sageTransferResponse.DocNum ?? "" },
+                                            { "@CompanyName", companyName },
+                                            { "@FinYear", finYear },
+                                            { "@RecNumber", reversalRecNumber }
+                                        };
+                                        await _databaseHelper.ExecuteNonQueryAsync(reversalSageSentQuery, reversalSageParams);
+                                        message += $" Sage Transfer API called successfully.";
+                                    }
+                                    else
+                                    {
+                                        var rollbackReversalQuery = @"
+                                            DELETE FROM Stock_Adjustment
+                                            WHERE Stock_Company_Name = @CompanyName
+                                            AND Stock_FIN_Year = @FinYear
+                                            AND Stock_REC_Type = 14
+                                            AND Stock_REC_Number = @RecNumber";
+
+                                        var rollbackReversalParams = new Dictionary<string, object>
+                                        {
+                                            { "@CompanyName", companyName },
+                                            { "@FinYear", finYear },
+                                            { "@RecNumber", reversalRecNumber }
+                                        };
+                                        await _databaseHelper.ExecuteNonQueryAsync(rollbackReversalQuery, rollbackReversalParams);
+                                        var transferErrors = sageTransferResponse?.Errors != null && sageTransferResponse.Errors.Count > 0
+                                            ? string.Join("; ", sageTransferResponse.Errors)
+                                            : sageTransferResponse?.Message ?? "Unknown Sage error";
+                                        message += $" Sage Transfer API failed: {transferErrors}. Reversal records rolled back.";
+                                    }
                                 }
                             }
                         }
-                    }
-                    else
-                    {
-                        message += $" Reversal creation failed: {reversalResult.ResultMessage}";
+                        else
+                        {
+                            message += $" Reversal creation failed: {reversalResult.ResultMessage}";
+                        }
                     }
 
-                    // Send rejection email to previous level approvers and creator
+                    // Send rejection email
                     try
                     {
                         var approverName = SessionHelper.GetUserName() ?? "Unknown";
-                        var docRefQuery = @"SELECT TOP 1
-                            CAST(sa.Stock_FIN_Year AS VARCHAR(10)) + '/' + sa.Stock_Company_Name + '/' + rm.REC_Name + '/' + CAST(sa.Stock_REC_Number AS VARCHAR(10)) AS DocumentReference
-                            FROM Stock_Adjustment sa
-                            INNER JOIN REC_Type_Master rm ON sa.Stock_REC_Type = rm.REC_Type
-                            WHERE sa.Stock_Company_Name = @CompanyName AND sa.Stock_FIN_Year = @FinYear AND sa.Stock_REC_Type = @RecType AND sa.Stock_REC_Number = @RecNumber";
-                        var docRefParams = new Dictionary<string, object>
-                        {
-                            { "@CompanyName", companyName }, { "@FinYear", finYear }, { "@RecType", recType }, { "@RecNumber", recNumber }
-                        };
-                        var docRefResult = await _databaseHelper.QuerySingleAsync<DocRefResult>(docRefQuery, docRefParams);
-                        var docRef = docRefResult?.DocumentReference ?? $"{finYear}/{recType}/{recNumber}";
+                        var docRef = $"{finYear}/{companyName}/{recNumber}";
 
                         await _emailService.SendRejectionEmailAsync(
-                            finYear, recType, recNumber, docRef, userApprovalLevel, approverName, remarks);
+                            finYear, 10, recNumber, docRef, userApprovalLevel, approverName, remarks);
                     }
                     catch { /* email failure should not break approval flow */ }
                 }
 
-                // Check if all levels are now fully approved → trigger Sage Adjustment Entry API
+                // Check if ALL levels for ALL RecTypes are now fully approved → trigger Sage Adjustment Entry API
                 SageAdjustmentEntryResponse sageAdjResponse = null;
                 if (action.ToLower() == "approve")
                 {
@@ -514,7 +534,7 @@ namespace AOSmith.Controllers
                         FROM Stock_Adjustment_Approval
                         WHERE Approval_Company_Name = @CompanyName
                         AND Approval_FIN_Year = @FinYear
-                        AND Approval_REC_Type = @RecType
+                        AND Approval_REC_Type IN (10, 12)
                         AND Approval_REC_Number = @RecNumber
                         AND Approval_Status != @ApprovedStatus";
 
@@ -522,7 +542,6 @@ namespace AOSmith.Controllers
                     {
                         { "@CompanyName", companyName },
                         { "@FinYear", finYear },
-                        { "@RecType", recType },
                         { "@RecNumber", recNumber },
                         { "@ApprovedStatus", ApprovalStatusConstants.Approved }
                     };
@@ -531,8 +550,8 @@ namespace AOSmith.Controllers
 
                     if (remainingCount != null && remainingCount.Value == 0)
                     {
-                        // All levels approved! Send to Sage API based on RecType
-                        var lineItemsQuery = @"
+                        // All levels approved for ALL RecTypes! Send ONE merged Sage Adjustment Entry API call
+                        var allLineItemsQuery = @"
                             SELECT
                                 sa.Stock_FIN_Year AS FinYear,
                                 sa.Stock_REC_Type AS RecType,
@@ -549,21 +568,20 @@ namespace AOSmith.Controllers
                             FROM Stock_Adjustment sa
                             WHERE sa.Stock_Company_Name = @CompanyName
                             AND sa.Stock_FIN_Year = @FinYear
-                            AND sa.Stock_REC_Type = @RecType
+                            AND sa.Stock_REC_Type IN (10, 12)
                             AND sa.Stock_REC_Number = @RecNumber
-                            ORDER BY sa.Stock_REC_SNO";
+                            ORDER BY sa.Stock_REC_Type, sa.Stock_REC_SNO";
 
                         var lineItemParams = new Dictionary<string, object>
                         {
                             { "@CompanyName", companyName },
                             { "@FinYear", finYear },
-                            { "@RecType", recType },
                             { "@RecNumber", recNumber }
                         };
 
-                        var lineItems = await _databaseHelper.QueryAsync<ApprovalLineItem>(lineItemsQuery, lineItemParams);
+                        var allLineItems = await _databaseHelper.QueryAsync<ApprovalLineItem>(allLineItemsQuery, lineItemParams);
 
-                        if (lineItems != null && lineItems.Any())
+                        if (allLineItems != null && allLineItems.Any())
                         {
                             // Get the transaction date
                             var dateQuery = @"
@@ -571,20 +589,19 @@ namespace AOSmith.Controllers
                                 FROM Stock_Adjustment
                                 WHERE Stock_Company_Name = @CompanyName
                                 AND Stock_FIN_Year = @FinYear
-                                AND Stock_REC_Type = @RecType
+                                AND Stock_REC_Type IN (10, 12)
                                 AND Stock_REC_Number = @RecNumber";
 
                             var dateRow = await _databaseHelper.QuerySingleAsync<DateResult>(dateQuery, lineItemParams);
                             var transDate = dateRow?.Value ?? DateTime.Now;
 
-                            // Both RecType 10 and 12 → Sage Adjustment Entry API after full approval
-                            var location = lineItems.First().ToLocation;
-
+                            // Send ONE merged Sage call with both Increase (transtype 5) and Decrease (transtype 6) items
                             sageAdjResponse = await _sageService.SendAdjustmentEntryAsync(
-                                companyName, finYear, lineItems, transDate, recNumber, recType, location);
+                                companyName, finYear, allLineItems, transDate, recNumber);
 
                             if (sageAdjResponse.IsSuccess)
                             {
+                                // Mark ALL RecType records as sent to Sage
                                 var sageSentQuery = @"
                                     UPDATE Stock_Adjustment
                                     SET Stock_Sage_Data_Sent = 1,
@@ -592,7 +609,7 @@ namespace AOSmith.Controllers
                                         Stock_Sage_Transaction_Number = @DocNum
                                     WHERE Stock_Company_Name = @CompanyName
                                     AND Stock_FIN_Year = @FinYear
-                                    AND Stock_REC_Type = @RecType
+                                    AND Stock_REC_Type IN (10, 12)
                                     AND Stock_REC_Number = @RecNumber";
 
                                 var sageSentParams = new Dictionary<string, object>
@@ -600,15 +617,14 @@ namespace AOSmith.Controllers
                                     { "@DocNum", sageAdjResponse.DocNum ?? "" },
                                     { "@CompanyName", companyName },
                                     { "@FinYear", finYear },
-                                    { "@RecType", recType },
                                     { "@RecNumber", recNumber }
                                 };
                                 await _databaseHelper.ExecuteNonQueryAsync(sageSentQuery, sageSentParams);
-                                message = $"Document fully approved! Sage Adjustment Entry API called.";
+                                message = $"Document fully approved! Sage Adjustment Entry API called successfully.";
                             }
                             else
                             {
-                                // Rollback approval status on Sage failure
+                                // Rollback approval status for ALL RecTypes at this level
                                 var rollbackQuery = @"
                                     UPDATE Stock_Adjustment_Approval
                                     SET Approval_Status = @PendingStatus,
@@ -617,7 +633,7 @@ namespace AOSmith.Controllers
                                         Approval_Comments = NULL
                                     WHERE Approval_Company_Name = @CompanyName
                                     AND Approval_FIN_Year = @FinYear
-                                    AND Approval_REC_Type = @RecType
+                                    AND Approval_REC_Type IN (10, 12)
                                     AND Approval_REC_Number = @RecNumber
                                     AND Approval_Level = @UserLevel";
 
@@ -626,7 +642,6 @@ namespace AOSmith.Controllers
                                     { "@PendingStatus", ApprovalStatusConstants.Pending },
                                     { "@CompanyName", companyName },
                                     { "@FinYear", finYear },
-                                    { "@RecType", recType },
                                     { "@RecNumber", recNumber },
                                     { "@UserLevel", userApprovalLevel }
                                 };
@@ -638,22 +653,18 @@ namespace AOSmith.Controllers
                             }
                         }
 
-                        // Send fully approved email to creator
-                        try
+                        // Send fully approved email
+                        if (sageAdjResponse != null && sageAdjResponse.IsSuccess)
                         {
-                            var approverNameFull = SessionHelper.GetUserName() ?? "Unknown";
-                            var docRefQueryFull = @"SELECT TOP 1
-                                CAST(sa.Stock_FIN_Year AS VARCHAR(10)) + '/' + sa.Stock_Company_Name + '/' + rm.REC_Name + '/' + CAST(sa.Stock_REC_Number AS VARCHAR(10)) AS DocumentReference
-                                FROM Stock_Adjustment sa
-                                INNER JOIN REC_Type_Master rm ON sa.Stock_REC_Type = rm.REC_Type
-                                WHERE sa.Stock_Company_Name = @CompanyName AND sa.Stock_FIN_Year = @FinYear AND sa.Stock_REC_Type = @RecType AND sa.Stock_REC_Number = @RecNumber";
-                            var docRefResultFull = await _databaseHelper.QuerySingleAsync<DocRefResult>(docRefQueryFull, lineItemParams);
-                            var docRefFull = docRefResultFull?.DocumentReference ?? $"{finYear}/{recType}/{recNumber}";
-
-                            await _emailService.SendFullyApprovedEmailAsync(
-                                finYear, recType, recNumber, docRefFull, approverNameFull);
+                            try
+                            {
+                                var approverNameFull = SessionHelper.GetUserName() ?? "Unknown";
+                                var docRefFull = $"{finYear}/{companyName}/{recNumber}";
+                                await _emailService.SendFullyApprovedEmailAsync(
+                                    finYear, 10, recNumber, docRefFull, approverNameFull);
+                            }
+                            catch { /* email failure should not break approval flow */ }
                         }
-                        catch { /* email failure should not break approval flow */ }
                     }
                     else
                     {
@@ -661,26 +672,15 @@ namespace AOSmith.Controllers
                         try
                         {
                             var approverNamePartial = SessionHelper.GetUserName() ?? "Unknown";
-                            var docRefQueryPartial = @"SELECT TOP 1
-                                CAST(sa.Stock_FIN_Year AS VARCHAR(10)) + '/' + sa.Stock_Company_Name + '/' + rm.REC_Name + '/' + CAST(sa.Stock_REC_Number AS VARCHAR(10)) AS DocumentReference
-                                FROM Stock_Adjustment sa
-                                INNER JOIN REC_Type_Master rm ON sa.Stock_REC_Type = rm.REC_Type
-                                WHERE sa.Stock_Company_Name = @CompanyName AND sa.Stock_FIN_Year = @FinYear AND sa.Stock_REC_Type = @RecType AND sa.Stock_REC_Number = @RecNumber";
-                            var docRefParamsPartial = new Dictionary<string, object>
-                            {
-                                { "@CompanyName", companyName }, { "@FinYear", finYear }, { "@RecType", recType }, { "@RecNumber", recNumber }
-                            };
-                            var docRefResultPartial = await _databaseHelper.QuerySingleAsync<DocRefResult>(docRefQueryPartial, docRefParamsPartial);
-                            var docRefPartial = docRefResultPartial?.DocumentReference ?? $"{finYear}/{recType}/{recNumber}";
-
+                            var docRefPartial = $"{finYear}/{companyName}/{recNumber}";
                             await _emailService.SendApprovalEmailToNextLevelAsync(
-                                finYear, recType, recNumber, docRefPartial, userApprovalLevel, approverNamePartial);
+                                finYear, 10, recNumber, docRefPartial, userApprovalLevel, approverNamePartial);
                         }
                         catch { /* email failure should not break approval flow */ }
                     }
                 }
 
-                // Build Sage response object
+                // Build response
                 object sageResponseObj = null;
                 bool isFullyApproved = false;
 

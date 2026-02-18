@@ -63,12 +63,13 @@
                                             <th style="width: 10%;">Stock On Hand</th>
                                             <th style="width: 8%;">Qty</th>
                                             <th style="width: 10%;">Cost</th>
-                                            <th style="width: 18%;">Action</th>
+                                            <th style="width: 10%;">Amount</th>
+                                            <th style="width: 15%;">Action</th>
                                         </tr>
                                     </thead>
                                     <tbody id="itemsTableBody">
                                         <tr id="noDataRow">
-                                            <td colspan="9" class="text-center text-muted">No items added yet. Click "Add Item" to begin.</td>
+                                            <td colspan="10" class="text-center text-muted">No items added yet. Click "Add Item" to begin.</td>
                                         </tr>
                                     </tbody>
                                 </table>
@@ -213,6 +214,12 @@
                             <div class="form-group">
                                 <label class="form-label fw-semibold">Cost</label>
                                 <input type="text" class="form-control bg-light" id="modalCost" readonly placeholder="Auto-filled" />
+                            </div>
+                        </div>
+                        <div class="col-md-2">
+                            <div class="form-group">
+                                <label class="form-label fw-semibold">Amount</label>
+                                <input type="text" class="form-control bg-light" id="modalAmount" readonly placeholder="Auto-calculated" />
                             </div>
                         </div>
                     </div>

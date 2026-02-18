@@ -222,6 +222,11 @@
             loadStockQty();
         });
 
+        // Quantity input - recalculate amount
+        $(document).on('input', '#modalQty', function () {
+            updateModalAmount();
+        });
+
         // File upload change events
         $('.file-upload').on('change', function () {
             handleFileUpload($(this));
@@ -381,6 +386,7 @@
         $('#editIndex').val(index);
         $('#modalItemDesc').val('');
         $('#modalCost').val('');
+        $('#modalAmount').val('');
         $('#modalStockOnHand').val('');
 
         // Show modal first so Select2 can measure properly
@@ -403,6 +409,7 @@
                 $('#modalItemDesc').val(item.itemDescription);
                 $('#modalCost').val(item.cost ? parseFloat(item.cost).toFixed(4) : '');
                 $('#modalStockOnHand').val(item.stockOnHand != null ? parseFloat(item.stockOnHand).toFixed(3) : '');
+                updateModalAmount();
             } else {
                 // Add mode
                 $('#stockRecSno').val(nextStockRecSno);
@@ -419,6 +426,7 @@
         if (!itemCode) {
             $('#modalItemDesc').val('');
             $('#modalCost').val('');
+            $('#modalAmount').val('');
             return;
         }
 
@@ -458,6 +466,7 @@
             {
                 if (response.success) {
                     $('#modalCost').val(response.cost != null ? parseFloat(response.cost).toFixed(4) : '0.0000');
+                    updateModalAmount();
                 } else {
                     $('#modalCost').val('');
                 }
@@ -498,6 +507,15 @@
                 showAlert('Error fetching stock quantity from Sage', 'error');
             }
         });
+    }
+
+    // Auto-calculate Amount = Cost * Qty in the modal
+    function updateModalAmount()
+    {
+        var cost = parseFloat($('#modalCost').val()) || 0;
+        var qty = parseFloat($('#modalQty').val()) || 0;
+        var amount = cost * qty;
+        $('#modalAmount').val(amount > 0 ? amount.toFixed(4) : '');
     }
 
     // Save item to grid
@@ -604,6 +622,7 @@
             var displaySno = index + 1;
             var costDisplay = item.cost ? parseFloat(item.cost).toFixed(4) : '0.0000';
             var stockOnHandDisplay = item.stockOnHand ? parseFloat(item.stockOnHand).toFixed(3) : '0.000';
+            var amountDisplay = (parseFloat(item.cost || 0) * parseFloat(item.qty || 0)).toFixed(4);
             var row = '<tr>' +
                 '<td>' + displaySno + '</td>' +
                 '<td>' + escapeHtml(item.recTypeName) + '</td>' +
@@ -613,6 +632,7 @@
                 '<td>' + stockOnHandDisplay + '</td>' +
                 '<td>' + item.qty.toFixed(3) + '</td>' +
                 '<td>' + costDisplay + '</td>' +
+                '<td>' + amountDisplay + '</td>' +
                 '<td>' +
                 '<button type="button" class="btn btn-sm btn-warning me-1" onclick="editItem(' + index + ')">' +
                 '<i class="bi bi-pencil-square"></i> Edit</button>' +
@@ -754,9 +774,11 @@
         $('#resultPopupModal').remove();
 
         var sageDetailsHtml = '';
-        if (sageResults && sageResults.length > 0) {
+        if (sageResults && sageResults.length > 0)
+        {
             sageDetailsHtml += '<div class="text-start mt-4">';
-            sageResults.forEach(function (sage, index) {
+            sageResults.forEach(function (sage, index)
+            {
                 var isSuccess = sage.isSuccess === true;
                 var statusClass = isSuccess ? 'success' : 'danger';
                 var statusIcon = isSuccess ? 'bi-check-circle-fill' : 'bi-x-circle-fill';
@@ -768,7 +790,8 @@
                     '<span class="badge bg-' + statusClass + '">' + escapeHtml(String(sage.sageStatus || 'Unknown')) + '</span></div>' +
                     '<div class="card-body py-2"><small><strong>Message:</strong> ' + escapeHtml(sage.sageMessage || 'No message') + '</small>';
 
-                if (sage.sageRawRequest || sage.sageRawResponse) {
+                if (sage.sageRawRequest || sage.sageRawResponse)
+                {
                     sageDetailsHtml += '<div class="mt-2">';
                     if (sage.sageRawRequest) {
                         sageDetailsHtml += '<button class="btn btn-sm btn-outline-primary me-1" type="button" data-bs-toggle="collapse" data-bs-target="#errReq' + index + '"><i class="bi bi-arrow-up-circle me-1"></i>Request</button>';

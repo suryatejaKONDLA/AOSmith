@@ -43,6 +43,7 @@ namespace AOSmith.Controllers
             const string sql = @"SELECT TOP 1
                             APP_ID as AppId,
                             RTRIM(APP_Default_Location) as AppDefaultLocation,
+                            RTRIM(APP_RecNumber_Prefix) as AppRecNumberPrefix,
                             APP_Created_ID as AppCreatedId,
                             APP_Created_DateTime as AppCreatedDateTime,
                             APP_Modified_ID as AppModifiedId,
@@ -96,6 +97,7 @@ namespace AOSmith.Controllers
                 {
                     new SqlParameter("@APP_ID", SqlDbType.Int) { Value = model.AppId },
                     new SqlParameter("@APP_Default_Location", SqlDbType.Char, 6) { Value = (object)model.AppDefaultLocation ?? DBNull.Value },
+                    new SqlParameter("@APP_RecNumber_Prefix", SqlDbType.VarChar, 10) { Value = (object)model.AppRecNumberPrefix ?? DBNull.Value },
                     new SqlParameter("@Session_ID", SqlDbType.Int) { Value = userId }
                 };
 

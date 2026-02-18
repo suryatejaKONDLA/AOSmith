@@ -6,6 +6,7 @@ namespace AOSmith.Models
     {
         public int AppId { get; set; }
         public string AppDefaultLocation { get; set; }
+        public string AppRecNumberPrefix { get; set; }
         public int? AppCreatedId { get; set; }
         public DateTime? AppCreatedDateTime { get; set; }
         public int? AppModifiedId { get; set; }

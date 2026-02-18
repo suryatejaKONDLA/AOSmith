@@ -916,21 +916,18 @@ namespace AOSmith.Controllers
                 {
                     // Build a single unified message with the shared record number
                     string consolidatedMessage;
-                    if (successMessages.Count == 1)
+                    var docRef = ExtractDocumentReference(successMessages[0]);
+                    var parts = docRef.Split('/');
+                    // Show unified DocNum format: Prefix + Company + RecNumber (padded to 6 digits)
+                    if (parts.Length >= 4)
                     {
-                        consolidatedMessage = successMessages[0];
+                        var prefixSql = "SELECT TOP 1 RTRIM(APP_RecNumber_Prefix) AS AppRecNumberPrefix FROM APP_Options ORDER BY APP_ID";
+                        var prefixResult = (await _dbHelper.QueryAsync<ApplicationOptions>(prefixSql)).FirstOrDefault();
+                        var prefix = prefixResult?.AppRecNumberPrefix?.Trim() ?? "SAGE";
+                        consolidatedMessage = $"Stock Adjustment {prefix}{parts[1]}{parts[3].PadLeft(6, '0')} created successfully.";
                     }
                     else
-                    {
-                        // Extract document reference from first message (format: "...FinYear/Company/RecTypeName/RecNumber...")
-                        var docRef = ExtractDocumentReference(successMessages[0]);
-                        var parts = docRef.Split('/');
-                        // Show unified: FinYear/Company/RecNumber
-                        if (parts.Length >= 4)
-                            consolidatedMessage = $"Stock Adjustment {parts[0]}/{parts[1]}/{parts[3]} created successfully.";
-                        else
-                            consolidatedMessage = successMessages[0];
-                    }
+                        consolidatedMessage = successMessages[0];
 
                     return Json(new
                     {

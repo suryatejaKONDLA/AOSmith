@@ -101,6 +101,16 @@
                                             <small class="text-muted">This location will be used as default for transactions</small>
                                         </div>
                                     </div>
+                                    <div class="col-md-6">
+                                        <div class="form-group">
+                                            <label for="AppRecNumberPrefix" class="form-label fw-semibold">
+                                                RecNumber Prefix <span class="text-danger">*</span>
+                                            </label>
+                                            @Html.TextBoxFor(m => m.AppRecNumberPrefix,
+                                                new { @class = "form-control", required = "required", id = "AppRecNumberPrefix", maxlength = "10", placeholder = "e.g. SAGE" })
+                                            <small class="text-muted">Prefix used for Sage DocNum (e.g. SAGE → SAGESMDAT000001)</small>
+                                        </div>
+                                    </div>
                                 </div>
 
                                 if (Model.AppModifiedDateTime != null)
