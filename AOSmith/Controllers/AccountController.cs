@@ -34,7 +34,7 @@ namespace AOSmith.Controllers
         {
             try
             {
-                const string sql = @"SELECT Company_Name, Company_Location
+                const string sql = @"SELECT Company_Name, Company_Description
                                     FROM Company_Master
                                     WHERE Company_Active_Flag = 1
                                     ORDER BY Company_Name";
@@ -43,7 +43,7 @@ namespace AOSmith.Controllers
                 var companyList = companies.Select(c => new
                 {
                     Value = c.Company_Name,
-                    Text = $"{c.Company_Name} ({c.Company_Location})"
+                    Text = (string)(c.Company_Description ?? c.Company_Name)
                 }).ToList();
 
                 ViewBag.Companies = new SelectList(companyList, "Value", "Text");

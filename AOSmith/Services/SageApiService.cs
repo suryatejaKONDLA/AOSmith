@@ -83,11 +83,25 @@ namespace AOSmith.Services
             return result?.Value ?? "UNK";
         }
 
-        private async Task<string> GetRecNumberPrefixAsync()
+        private async Task<string> GetTranNumberPrefixAsync()
         {
-            var sql = "SELECT TOP 1 RTRIM(APP_RecNumber_Prefix) AS Value FROM APP_Options ORDER BY APP_ID";
+            var sql = "SELECT TOP 1 RTRIM(APP_TranNumber_Prefix) AS Value FROM APP_Options ORDER BY APP_ID";
             var result = await _dbHelper.QuerySingleAsync<StringResult>(sql);
             return result?.Value ?? "SAGE";
+        }
+
+        private async Task<string> GetAdjuNumberPrefixAsync()
+        {
+            var sql = "SELECT TOP 1 RTRIM(APP_AdjuNumber_Prefix) AS Value FROM APP_Options ORDER BY APP_ID";
+            var result = await _dbHelper.QuerySingleAsync<StringResult>(sql);
+            return result?.Value ?? "ADJ";
+        }
+
+        private async Task<string> GetReveNumberPrefixAsync()
+        {
+            var sql = "SELECT TOP 1 RTRIM(APP_ReveNumber_Prefix) AS Value FROM APP_Options ORDER BY APP_ID";
+            var result = await _dbHelper.QuerySingleAsync<StringResult>(sql);
+            return result?.Value ?? "REV";
         }
 
         // ========== Transfer Entry ==========
@@ -105,9 +119,10 @@ namespace AOSmith.Services
             {
                 var creds = await GetSageCredentialsAsync(companyName);
                 var recName = await GetRecTypeNameAsync(recType);
-                var prefix = await GetRecNumberPrefixAsync();
+                var tranPrefix = await GetTranNumberPrefixAsync();
+                var revePrefix = await GetReveNumberPrefixAsync();
 
-                var request = BuildRequest(creds, companyName, finYear, recName, prefix, lineItems, transactionDate, recNumber, recType);
+                var request = BuildRequest(creds, companyName, finYear, recName, tranPrefix, revePrefix, lineItems, transactionDate, recNumber, recType);
                 jsonPayload = JsonConvert.SerializeObject(request, Formatting.Indented);
 
                 var content = new StringContent(jsonPayload, Encoding.UTF8, "application/json");
@@ -171,7 +186,8 @@ namespace AOSmith.Services
             string companyName,
             int finYear,
             string recName,
-            string prefix,
+            string tranPrefix,
+            string revePrefix,
             List<StockAdjustmentLineItem> lineItems,
             DateTime transactionDate,
             int recNumber,
@@ -180,7 +196,7 @@ namespace AOSmith.Services
             var transDateStr = transactionDate.ToString("yyyy-MM-ddTHH:mm:ss");
             var expArDateStr = transactionDate.AddMonths(1).ToString("yyyy-MM-ddTHH:mm:ss");
             var recTypeName2 = recType == 12 ? "INCREASE" : recType == 14 ? "REVERSAL" : "DECREASE";
-            var docNumPrefix = recType == 14 ? recName : prefix;
+            var docNumPrefix = recType == 14 ? revePrefix : tranPrefix;
             var docReference = $"{finYear}/{companyName}/{recName}/{recNumber}";
 
             var request = new SageTransferEntryRequest
@@ -222,8 +238,9 @@ namespace AOSmith.Services
             try
             {
                 var creds = await GetSageCredentialsAsync(companyName);
+                var adjuPrefix = await GetAdjuNumberPrefixAsync();
 
-                var request = BuildAdjustmentRequest(creds, companyName, finYear, lineItems, transactionDate, recNumber);
+                var request = BuildAdjustmentRequest(creds, companyName, finYear, adjuPrefix, lineItems, transactionDate, recNumber);
                 jsonPayload = JsonConvert.SerializeObject(request, Formatting.Indented);
 
                 var content = new StringContent(jsonPayload, Encoding.UTF8, "application/json");
@@ -286,19 +303,20 @@ namespace AOSmith.Services
             SageCredentials creds,
             string companyName,
             int finYear,
+            string adjuPrefix,
             List<ApprovalLineItem> lineItems,
             DateTime transactionDate,
             int recNumber)
         {
             var transDateStr = transactionDate.ToString("yyyy-MM-ddTHH:mm:ss");
-            var docReference = $"{finYear}/{companyName}/ADJ/{recNumber}";
+            var docReference = $"{finYear}/{companyName}/{adjuPrefix}/{recNumber}";
 
             var request = new SageAdjustmentEntryRequest
             {
                 UserId = creds.UserId,
                 Password = creds.Password,
                 CompanyId = creds.CompanyId,
-                DocNum = $"ADJ{companyName}{recNumber.ToString().PadLeft(6, '0')}",
+                DocNum = $"{adjuPrefix}{companyName}{recNumber.ToString().PadLeft(6, '0')}",
                 Reference = docReference,
                 TransDate = transDateStr,
                 HdrDesc = $"Stock adjustment #{recNumber} - Approved",

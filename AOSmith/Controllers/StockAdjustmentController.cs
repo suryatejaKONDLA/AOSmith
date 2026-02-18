@@ -921,9 +921,9 @@ namespace AOSmith.Controllers
                     // Show unified DocNum format: Prefix + Company + RecNumber (padded to 6 digits)
                     if (parts.Length >= 4)
                     {
-                        var prefixSql = "SELECT TOP 1 RTRIM(APP_RecNumber_Prefix) AS AppRecNumberPrefix FROM APP_Options ORDER BY APP_ID";
+                        var prefixSql = "SELECT TOP 1 RTRIM(APP_TranNumber_Prefix) AS AppTranNumberPrefix FROM APP_Options ORDER BY APP_ID";
                         var prefixResult = (await _dbHelper.QueryAsync<ApplicationOptions>(prefixSql)).FirstOrDefault();
-                        var prefix = prefixResult?.AppRecNumberPrefix?.Trim() ?? "SAGE";
+                        var prefix = prefixResult?.AppTranNumberPrefix?.Trim() ?? "SAGE";
                         consolidatedMessage = $"Stock Adjustment {prefix}{parts[1]}{parts[3].PadLeft(6, '0')} created successfully.";
                     }
                     else

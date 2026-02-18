@@ -43,7 +43,9 @@ namespace AOSmith.Controllers
             const string sql = @"SELECT TOP 1
                             APP_ID as AppId,
                             RTRIM(APP_Default_Location) as AppDefaultLocation,
-                            RTRIM(APP_RecNumber_Prefix) as AppRecNumberPrefix,
+                            RTRIM(APP_TranNumber_Prefix) as AppTranNumberPrefix,
+                            RTRIM(APP_AdjuNumber_Prefix) as AppAdjuNumberPrefix,
+                            RTRIM(APP_ReveNumber_Prefix) as AppReveNumberPrefix,
                             APP_Created_ID as AppCreatedId,
                             APP_Created_DateTime as AppCreatedDateTime,
                             APP_Modified_ID as AppModifiedId,
@@ -97,7 +99,9 @@ namespace AOSmith.Controllers
                 {
                     new SqlParameter("@APP_ID", SqlDbType.Int) { Value = model.AppId },
                     new SqlParameter("@APP_Default_Location", SqlDbType.Char, 6) { Value = (object)model.AppDefaultLocation ?? DBNull.Value },
-                    new SqlParameter("@APP_RecNumber_Prefix", SqlDbType.VarChar, 10) { Value = (object)model.AppRecNumberPrefix ?? DBNull.Value },
+                    new SqlParameter("@APP_TranNumber_Prefix", SqlDbType.VarChar, 10) { Value = (object)model.AppTranNumberPrefix ?? DBNull.Value },
+                    new SqlParameter("@APP_AdjuNumber_Prefix", SqlDbType.VarChar, 10) { Value = (object)model.AppAdjuNumberPrefix ?? DBNull.Value },
+                    new SqlParameter("@APP_ReveNumber_Prefix", SqlDbType.VarChar, 10) { Value = (object)model.AppReveNumberPrefix ?? DBNull.Value },
                     new SqlParameter("@Session_ID", SqlDbType.Int) { Value = userId }
                 };
 
@@ -238,6 +242,79 @@ namespace AOSmith.Controllers
                 var result = await _dbHelper.ExecuteStoredProcedureWithOutputsAsync("ApprovalAmountThreshold_Insert", parameters);
 
                 return Json(new { success = result.IsSuccess, message = result.ResultMessage });
+            }
+            catch (Exception ex)
+            {
+                return Json(new { success = false, message = ex.Message });
+            }
+        }
+
+        // ==================== ROW AMOUNT THRESHOLD ====================
+
+        /// <summary>
+        /// Get the single Row_Amount_Threshold record
+        /// </summary>
+        [HttpGet]
+        public async Task<JsonResult> GetRowAmountThreshold()
+        {
+            try
+            {
+                const string sql = @"SELECT TOP 1
+                    Row_ID AS RowId,
+                    Row_Amount AS RowAmount,
+                    Row_Created_ID AS RowCreatedId,
+                    Row_Created_Date AS RowCreatedDate,
+                    Row_Modified_ID AS RowModifiedId,
+                    Row_Modified_Date AS RowModifiedDate
+                FROM Row_Amount_Threshold ORDER BY Row_ID";
+
+                var result = (await _dbHelper.QueryAsync<RowAmountThreshold>(sql)).FirstOrDefault();
+                return Json(new { success = true, data = result }, JsonRequestBehavior.AllowGet);
+            }
+            catch (Exception ex)
+            {
+                return Json(new { success = false, message = ex.Message }, JsonRequestBehavior.AllowGet);
+            }
+        }
+
+        /// <summary>
+        /// Save (insert or update) the single Row_Amount_Threshold record
+        /// </summary>
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<JsonResult> SaveRowAmountThreshold(decimal rowAmount)
+        {
+            try
+            {
+                var userId = SessionHelper.GetUserId();
+                if (userId != 1)
+                {
+                    return Json(new { success = false, message = "Access denied" });
+                }
+
+                const string sql = @"
+                    IF EXISTS (SELECT 1 FROM Row_Amount_Threshold)
+                    BEGIN
+                        UPDATE Row_Amount_Threshold
+                        SET Row_Amount = @RowAmount,
+                            Row_Modified_ID = @SessionId,
+                            Row_Modified_Date = GETDATE()
+                        WHERE Row_ID = (SELECT TOP 1 Row_ID FROM Row_Amount_Threshold ORDER BY Row_ID);
+                    END
+                    ELSE
+                    BEGIN
+                        INSERT INTO Row_Amount_Threshold (Row_Amount, Row_Created_ID, Row_Created_Date)
+                        VALUES (@RowAmount, @SessionId, GETDATE());
+                    END";
+
+                var parameters = new Dictionary<string, object>
+                {
+                    { "@RowAmount", rowAmount },
+                    { "@SessionId", userId }
+                };
+
+                await _dbHelper.ExecuteNonQueryAsync(sql, parameters);
+                return Json(new { success = true, message = "Row amount threshold saved successfully." });
             }
             catch (Exception ex)
             {

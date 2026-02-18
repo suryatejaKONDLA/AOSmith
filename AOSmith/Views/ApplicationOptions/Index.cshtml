@@ -43,6 +43,12 @@
                                 <i class="bi bi-cash-stack me-1"></i> Approval Amount Threshold
                             </button>
                         </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link" id="tab-rowthreshold" data-bs-toggle="tab" data-bs-target="#pane-rowthreshold"
+                                    type="button" role="tab" aria-controls="pane-rowthreshold" aria-selected="false">
+                                <i class="bi bi-sliders2 me-1"></i> Row Amount Threshold
+                            </button>
+                        </li>
                     </ul>
 
                     <div class="tab-content" id="appOptionsTabContent">
@@ -103,12 +109,35 @@
                                     </div>
                                     <div class="col-md-6">
                                         <div class="form-group">
-                                            <label for="AppRecNumberPrefix" class="form-label fw-semibold">
-                                                RecNumber Prefix <span class="text-danger">*</span>
+                                            <label for="AppTranNumberPrefix" class="form-label fw-semibold">
+                                                Transfer Prefix <span class="text-danger">*</span>
                                             </label>
-                                            @Html.TextBoxFor(m => m.AppRecNumberPrefix,
-                                                new { @class = "form-control", required = "required", id = "AppRecNumberPrefix", maxlength = "10", placeholder = "e.g. SAGE" })
-                                            <small class="text-muted">Prefix used for Sage DocNum (e.g. SAGE → SAGESMDAT000001)</small>
+                                            @Html.TextBoxFor(m => m.AppTranNumberPrefix,
+                                                new { @class = "form-control", required = "required", id = "AppTranNumberPrefix", maxlength = "10", placeholder = "e.g. SAGE" })
+                                            <small class="text-muted">Prefix for Transfer DocNum (e.g. SAGE → SAGESMDAT000001)</small>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="row g-4 mt-1">
+                                    <div class="col-md-6">
+                                        <div class="form-group">
+                                            <label for="AppAdjuNumberPrefix" class="form-label fw-semibold">
+                                                Adjustment Prefix <span class="text-danger">*</span>
+                                            </label>
+                                            @Html.TextBoxFor(m => m.AppAdjuNumberPrefix,
+                                                new { @class = "form-control", required = "required", id = "AppAdjuNumberPrefix", maxlength = "10", placeholder = "e.g. ADJ" })
+                                            <small class="text-muted">Prefix for Adjustment DocNum (e.g. ADJ → ADJSMDAT000001)</small>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="form-group">
+                                            <label for="AppReveNumberPrefix" class="form-label fw-semibold">
+                                                Reversal Prefix <span class="text-danger">*</span>
+                                            </label>
+                                            @Html.TextBoxFor(m => m.AppReveNumberPrefix,
+                                                new { @class = "form-control", required = "required", id = "AppReveNumberPrefix", maxlength = "10", placeholder = "e.g. REV" })
+                                            <small class="text-muted">Prefix for Reversal DocNum (e.g. REV → REVSMDAT000001)</small>
                                         </div>
                                     </div>
                                 </div>
@@ -178,6 +207,41 @@
                                         <i class="bi bi-save me-2"></i>Save Thresholds
                                     </button>
                                 </div>
+                            </div>
+                        </div>
+
+                        <!-- ===================== TAB 3: ROW AMOUNT THRESHOLD ===================== -->
+                        <div class="tab-pane fade" id="pane-rowthreshold" role="tabpanel" aria-labelledby="tab-rowthreshold">
+
+                            <div class="alert alert-secondary border-0 mb-4">
+                                <i class="bi bi-info-circle me-2"></i>
+                                Configure the <strong>row-level amount threshold</strong>. If any individual line item's amount exceeds this value,
+                                the approval level will be determined by that row's amount instead of the total.
+                            </div>
+
+                            <div id="rowThresholdSpinner" class="text-center py-4" style="display:none;">
+                                <div class="spinner-border text-primary" role="status">
+                                    <span class="visually-hidden">Loading...</span>
+                                </div>
+                                <p class="mt-2 text-muted">Loading row threshold...</p>
+                            </div>
+
+                            <div class="table-responsive">
+                                <table class="table table-bordered table-hover align-middle" id="rowThresholdTable">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th style="width:15%;" class="text-center">ID</th>
+                                            <th style="width:35%;">Row Amount Threshold <span class="text-danger">*</span></th>
+                                            <th style="width:25%;" class="text-center">Last Modified</th>
+                                            <th style="width:25%;" class="text-center">Action</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="rowThresholdTableBody">
+                                        <tr>
+                                            <td colspan="4" class="text-center text-muted">Loading...</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
                             </div>
                         </div>
                     </div>
@@ -599,6 +663,101 @@
                 var d = new Date(val);
                 return isNaN(d.getTime()) ? null : d;
             }
+
+            // ================ TAB 3: ROW AMOUNT THRESHOLD ================
+
+            var rowThresholdTabLoaded = false;
+
+            $('button[data-bs-target="#pane-rowthreshold"]').on('shown.bs.tab', function () {
+                if (!rowThresholdTabLoaded) {
+                    loadRowAmountThreshold();
+                    rowThresholdTabLoaded = true;
+                }
+            });
+
+            function loadRowAmountThreshold() {
+                $('#rowThresholdSpinner').show();
+
+                $.ajax({
+                    url: '@Url.Action("GetRowAmountThreshold", "ApplicationOptions")',
+                    type: 'GET',
+                    success: function (response) {
+                        $('#rowThresholdSpinner').hide();
+                        var tbody = $('#rowThresholdTableBody');
+                        tbody.empty();
+
+                        if (response.success && response.data) {
+                            var rec = response.data;
+                            var modifiedStr = '-';
+                            if (rec.RowModifiedDate) {
+                                var d = parseMsDate(rec.RowModifiedDate);
+                                if (d) {
+                                    var day = ('0' + d.getDate()).slice(-2);
+                                    var months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+                                    modifiedStr = day + '-' + months[d.getMonth()] + '-' + d.getFullYear() + ' ' +
+                                        ('0' + d.getHours()).slice(-2) + ':' + ('0' + d.getMinutes()).slice(-2);
+                                }
+                            }
+
+                            var row = '<tr>' +
+                                '<td class="text-center"><span class="badge bg-secondary">' + rec.RowId + '</span></td>' +
+                                '<td><input type="number" class="form-control" id="rowAmountInput" value="' + (rec.RowAmount || 0).toFixed(2) + '" step="0.01" min="0" placeholder="Enter row amount threshold" required /></td>' +
+                                '<td class="text-center"><small class="text-muted">' + modifiedStr + '</small></td>' +
+                                '<td class="text-center"><button type="button" class="btn btn-primary btn-sm" id="btnSaveRowThreshold"><i class="bi bi-save me-1"></i>Save</button></td>' +
+                                '</tr>';
+                            tbody.append(row);
+                        } else {
+                            // No record exists yet - show input to create
+                            var row = '<tr>' +
+                                '<td class="text-center"><span class="badge bg-secondary">New</span></td>' +
+                                '<td><input type="number" class="form-control" id="rowAmountInput" value="" step="0.01" min="0" placeholder="Enter row amount threshold" required /></td>' +
+                                '<td class="text-center"><small class="text-muted">-</small></td>' +
+                                '<td class="text-center"><button type="button" class="btn btn-primary btn-sm" id="btnSaveRowThreshold"><i class="bi bi-save me-1"></i>Save</button></td>' +
+                                '</tr>';
+                            tbody.append(row);
+                        }
+                    },
+                    error: function () {
+                        $('#rowThresholdSpinner').hide();
+                        showToast('error', 'Failed to load row amount threshold');
+                    }
+                });
+            }
+
+            $(document).on('click', '#btnSaveRowThreshold', function () {
+                var amount = parseFloat($('#rowAmountInput').val());
+                if (isNaN(amount) || amount < 0) {
+                    showToast('error', 'Please enter a valid amount');
+                    return;
+                }
+
+                var $btn = $(this);
+                $btn.prop('disabled', true).html('<i class="bi bi-hourglass-split me-1"></i>Saving...');
+
+                $.ajax({
+                    url: '@Url.Action("SaveRowAmountThreshold", "ApplicationOptions")',
+                    type: 'POST',
+                    data: {
+                        rowAmount: amount,
+                        __RequestVerificationToken: $('input[name="__RequestVerificationToken"]').val()
+                    },
+                    success: function (response) {
+                        $btn.prop('disabled', false).html('<i class="bi bi-save me-1"></i>Save');
+                        if (response.success) {
+                            showToast('success', response.message);
+                            rowThresholdTabLoaded = false;
+                            loadRowAmountThreshold();
+                        } else {
+                            showToast('error', response.message);
+                        }
+                    },
+                    error: function () {
+                        $btn.prop('disabled', false).html('<i class="bi bi-save me-1"></i>Save');
+                        showToast('error', 'An error occurred while saving');
+                    }
+                });
+            });
+
         });
     </script>
 }
