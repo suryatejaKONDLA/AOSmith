@@ -72,7 +72,6 @@
                                 <tr>
                                     <th style="width: 30px;"></th>
                                     <th>Document Ref</th>
-                                    <th>Type</th>
                                     <th>Date</th>
                                     <th>Created By</th>
                                     <th>Department</th>
@@ -82,7 +81,7 @@
                             </thead>
                             <tbody id="reportTableBody">
                                 <tr>
-                                    <td colspan="8" class="text-center py-4 text-muted">
+                                    <td colspan="7" class="text-center py-4 text-muted">
                                         <i class="bi bi-calendar-range fs-1"></i>
                                         <p class="mt-2 mb-0">Select a date range and click <strong>View</strong> to load records.</p>
                                     </td>
@@ -142,7 +141,7 @@
             }
 
             var tbody = $('#reportTableBody');
-            tbody.html('<tr><td colspan="8" class="text-center py-4"><div class="spinner-border text-primary" role="status"></div><p class="mt-2 mb-0">Loading records...</p></td></tr>');
+            tbody.html('<tr><td colspan="7" class="text-center py-4"><div class="spinner-border text-primary" role="status"></div><p class="mt-2 mb-0">Loading records...</p></td></tr>');
             $('#recordCount').text('');
 
             showSpinner('Fetching report data...');
@@ -156,12 +155,12 @@
                     if (response.success) {
                         displayReportData(response.data);
                     } else {
-                        tbody.html('<tr><td colspan="8" class="text-center py-4 text-danger"><i class="bi bi-exclamation-triangle fs-3"></i><p class="mt-2 mb-0">' + escapeHtml(response.message) + '</p></td></tr>');
+                        tbody.html('<tr><td colspan="7" class="text-center py-4 text-danger"><i class="bi bi-exclamation-triangle fs-3"></i><p class="mt-2 mb-0">' + escapeHtml(response.message) + '</p></td></tr>');
                     }
                 },
                 error: function (xhr, status, error) {
                     hideSpinner();
-                    tbody.html('<tr><td colspan="8" class="text-center py-4 text-danger"><i class="bi bi-exclamation-triangle fs-3"></i><p class="mt-2 mb-0">Error loading data: ' + escapeHtml(error) + '</p></td></tr>');
+                    tbody.html('<tr><td colspan="7" class="text-center py-4 text-danger"><i class="bi bi-exclamation-triangle fs-3"></i><p class="mt-2 mb-0">Error loading data: ' + escapeHtml(error) + '</p></td></tr>');
                 }
             });
         }
@@ -171,7 +170,7 @@
             tbody.empty();
 
             if (!documents || documents.length === 0) {
-                tbody.html('<tr><td colspan="8" class="text-center py-4"><i class="bi bi-inbox fs-1 text-muted"></i><p class="mt-2 mb-0 text-muted">No records found for the selected date range.</p></td></tr>');
+                tbody.html('<tr><td colspan="7" class="text-center py-4"><i class="bi bi-inbox fs-1 text-muted"></i><p class="mt-2 mb-0 text-muted">No records found for the selected date range.</p></td></tr>');
                 $('#recordCount').text('0 records');
                 return;
             }
@@ -179,7 +178,7 @@
             $('#recordCount').text(documents.length + ' record(s)');
 
             $.each(documents, function (index, doc) {
-                var key = doc.FinYear + '_' + doc.RecType + '_' + doc.RecNumber;
+                var key = doc.FinYear + '_' + doc.RecNumber;
 
                 // Build approval progress badges
                 var progressHtml = buildApprovalProgress(doc);
@@ -187,16 +186,10 @@
                 // Status badge
                 var statusHtml = getOverallStatus(doc);
 
-                // Type badge
-                var typeBadge = doc.RecType === 10
-                    ? '<span class="badge bg-warning text-dark">Decrease</span>'
-                    : '<span class="badge bg-info">Increase</span>';
-
-                // Main document row
+                // Main document row (merged - no Type column)
                 var row = '<tr class="doc-row" data-key="' + key + '">' +
                     '<td class="text-center"><i class="bi bi-chevron-right toggle-icon"></i></td>' +
                     '<td><strong>' + escapeHtml(doc.DocumentReference) + '</strong></td>' +
-                    '<td>' + typeBadge + '</td>' +
                     '<td>' + formatDate(doc.Date) + '</td>' +
                     '<td>' + escapeHtml(doc.CreatedBy || '') + '</td>' +
                     '<td>' + escapeHtml(doc.Department || '') + '</td>' +
@@ -206,7 +199,7 @@
 
                 // Detail row (hidden by default)
                 var detailRow = '<tr class="detail-row" id="detail-' + key + '" style="display:none;">' +
-                    '<td colspan="8">' + buildDetailContent(doc) + '</td>' +
+                    '<td colspan="7">' + buildDetailContent(doc) + '</td>' +
                     '</tr>';
 
                 tbody.append(row);
@@ -305,18 +298,21 @@
             if (doc.LineItems && doc.LineItems.length > 0) {
                 html += '<h6 class="mb-2"><i class="bi bi-list-ul me-1"></i>Line Items</h6>';
                 html += '<table class="table table-sm table-bordered line-items-table">';
-                html += '<thead><tr><th>#</th><th>Item Code</th><th>Description</th><th>From Location</th><th>To Location</th><th>Quantity</th><th class="text-end">Cost</th><th class="text-end">Amount</th></tr></thead>';
+                html += '<thead><tr><th>#</th><th>Type</th><th>Item Code</th><th>Description</th><th>Location</th><th>Quantity</th><th class="text-end">Cost</th><th class="text-end">Amount</th></tr></thead>';
                 html += '<tbody>';
                 var totalAmount = 0;
                 $.each(doc.LineItems, function (i, item) {
                     var amt = parseFloat(item.Amount || 0);
                     totalAmount += amt;
+                    var typeBadge = item.RecType === 10
+                        ? '<span class="badge bg-warning text-dark">Decrease</span>'
+                        : '<span class="badge bg-info">Increase</span>';
                     html += '<tr>' +
                         '<td>' + item.Sno + '</td>' +
+                        '<td>' + typeBadge + '</td>' +
                         '<td>' + escapeHtml(item.ItemCode) + '</td>' +
                         '<td>' + escapeHtml(item.ItemDesc || '') + '</td>' +
-                        '<td>' + escapeHtml(item.FromLocation) + ' - ' + escapeHtml(item.FromLocationName || '') + '</td>' +
-                        '<td>' + escapeHtml(item.ToLocation) + ' - ' + escapeHtml(item.ToLocationName || '') + '</td>' +
+                        '<td>' + (item.RecType === 12 ? escapeHtml(item.ToLocation) : escapeHtml(item.FromLocation)) + ' - ' + (item.RecType === 12 ? escapeHtml(item.ToLocationName || '') : escapeHtml(item.FromLocationName || '')) + '</td>' +
                         '<td>' + item.Quantity + '</td>' +
                         '<td class="text-end">' + parseFloat(item.Cost || 0).toFixed(2) + '</td>' +
                         '<td class="text-end">' + amt.toFixed(2) + '</td>' +

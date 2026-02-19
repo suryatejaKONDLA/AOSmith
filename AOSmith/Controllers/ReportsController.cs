@@ -210,48 +210,76 @@ namespace AOSmith.Controllers
                 // Resolve item and location names from Sage API
                 await ResolveNamesFromSageApi(companyName, lineItems);
 
-                // Group everything together
-                var result = documents.Select(doc => new
-                {
-                    doc.FinYear,
-                    doc.RecType,
-                    doc.RecNumber,
-                    doc.DocumentReference,
-                    doc.Date,
-                    doc.CreatedBy,
-                    doc.Department,
-                    doc.TotalLevels,
-                    doc.ApprovedCount,
-                    doc.RejectedCount,
-                    doc.NextPendingLevel,
-                    doc.RecTypeName,
-                    Levels = levels?.Where(l => l.FinYear == doc.FinYear && l.RecType == doc.RecType && l.RecNumber == doc.RecNumber)
-                        .OrderBy(l => l.Level)
-                        .Select(l => new
+                // Group by (FinYear, RecNumber) to merge RecType 10 and 12 into one row (same as Approval)
+                var result = documents
+                    .GroupBy(doc => new { doc.FinYear, doc.RecNumber })
+                    .Select(g =>
+                    {
+                        var first = g.First();
+                        var allRecTypes = g.Select(d => d.RecType).Distinct().OrderBy(r => r).ToList();
+
+                        // Merge approval counts across RecTypes
+                        var totalLevels = g.Sum(d => d.TotalLevels);
+                        var approvedCount = g.Sum(d => d.ApprovedCount);
+                        var rejectedCount = g.Sum(d => d.RejectedCount);
+
+                        // NextPendingLevel: if any rejected -> -1; if all fully approved -> 0; else min pending
+                        int nextPending;
+                        if (g.Any(d => d.NextPendingLevel == -1))
+                            nextPending = -1;
+                        else if (g.All(d => d.NextPendingLevel == 0))
+                            nextPending = 0;
+                        else
+                            nextPending = g.Where(d => d.NextPendingLevel > 0).Any()
+                                ? g.Where(d => d.NextPendingLevel > 0).Min(d => d.NextPendingLevel)
+                                : 0;
+
+                        // Document reference without RecType name
+                        var docRef = $"{first.FinYear}/{companyName}/{first.RecNumber}";
+
+                        return new
                         {
-                            l.Level,
-                            l.StatusCode,
-                            l.StatusName,
-                            l.ApproverName,
-                            l.ApprovalDate,
-                            l.Comments
-                        }).ToList(),
-                    LineItems = lineItems?.Where(li => li.FinYear == doc.FinYear && li.RecType == doc.RecType && li.RecNumber == doc.RecNumber)
-                        .OrderBy(li => li.Sno)
-                        .Select(li => new
-                        {
-                            li.Sno,
-                            li.ItemCode,
-                            li.ItemDesc,
-                            li.FromLocation,
-                            li.FromLocationName,
-                            li.ToLocation,
-                            li.ToLocationName,
-                            li.Quantity,
-                            li.Cost,
-                            li.Amount
-                        }).ToList()
-                }).ToList();
+                            first.FinYear,
+                            first.RecNumber,
+                            DocumentReference = docRef,
+                            first.Date,
+                            first.CreatedBy,
+                            first.Department,
+                            TotalLevels = totalLevels,
+                            ApprovedCount = approvedCount,
+                            RejectedCount = rejectedCount,
+                            NextPendingLevel = nextPending,
+                            RecTypes = allRecTypes,
+                            Levels = levels?.Where(l => l.FinYear == first.FinYear && l.RecType == first.RecType && l.RecNumber == first.RecNumber)
+                                .OrderBy(l => l.Level)
+                                .Select(l => new
+                                {
+                                    l.Level,
+                                    l.StatusCode,
+                                    l.StatusName,
+                                    l.ApproverName,
+                                    l.ApprovalDate,
+                                    l.Comments
+                                }).ToList(),
+                            LineItems = lineItems?.Where(li => li.FinYear == first.FinYear && li.RecNumber == first.RecNumber)
+                                .OrderBy(li => li.RecType).ThenBy(li => li.Sno)
+                                .Select(li => new
+                                {
+                                    li.RecType,
+                                    RecTypeName = li.RecType == 10 ? "Decrease" : "Increase",
+                                    li.Sno,
+                                    li.ItemCode,
+                                    li.ItemDesc,
+                                    li.FromLocation,
+                                    li.FromLocationName,
+                                    li.ToLocation,
+                                    li.ToLocationName,
+                                    li.Quantity,
+                                    li.Cost,
+                                    li.Amount
+                                }).ToList()
+                        };
+                    }).ToList();
 
                 return Json(new { success = true, data = result }, JsonRequestBehavior.AllowGet);
             }
