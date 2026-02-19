@@ -104,6 +104,13 @@ namespace AOSmith.Services
             return result?.Value ?? "REV";
         }
 
+        private async Task<string> GetDefaultLocationAsync()
+        {
+            var sql = "SELECT TOP 1 RTRIM(APP_Default_Location) AS Value FROM APP_Options ORDER BY APP_ID";
+            var result = await _dbHelper.QuerySingleAsync<StringResult>(sql);
+            return result?.Value ?? "";
+        }
+
         // ========== Transfer Entry ==========
 
         public async Task<SageTransferEntryResponse> SendTransferEntryAsync(
@@ -239,8 +246,9 @@ namespace AOSmith.Services
             {
                 var creds = await GetSageCredentialsAsync(companyName);
                 var adjuPrefix = await GetAdjuNumberPrefixAsync();
+                var defaultLocation = await GetDefaultLocationAsync();
 
-                var request = BuildAdjustmentRequest(creds, companyName, finYear, adjuPrefix, lineItems, transactionDate, recNumber);
+                var request = BuildAdjustmentRequest(creds, companyName, finYear, adjuPrefix, defaultLocation, lineItems, transactionDate, recNumber);
                 jsonPayload = JsonConvert.SerializeObject(request, Formatting.Indented);
 
                 var content = new StringContent(jsonPayload, Encoding.UTF8, "application/json");
@@ -304,6 +312,7 @@ namespace AOSmith.Services
             string companyName,
             int finYear,
             string adjuPrefix,
+            string defaultLocation,
             List<ApprovalLineItem> lineItems,
             DateTime transactionDate,
             int recNumber)
@@ -325,7 +334,9 @@ namespace AOSmith.Services
                 {
                     AdjDetailOptFields = new List<SageOptField>(),
                     ItemNo = item.ItemCode?.Trim(),
-                    Location = item.RecType == 12 ? item.ToLocation?.Trim() : item.FromLocation?.Trim(),
+                    Location = item.RecType == 12
+                        ? item.ToLocation?.Trim()
+                        : (!string.IsNullOrEmpty(defaultLocation) ? defaultLocation : item.FromLocation?.Trim()),
                     WoffAcct = "",
                     Quantity = item.Quantity,
                     ExtCost = item.Cost * item.Quantity,
