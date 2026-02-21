@@ -177,7 +177,8 @@ namespace AOSmith.Controllers
                         '' AS ToLocationName,
                         sa.Stock_Qty AS Quantity,
                         ISNULL(sa.Stock_Cost, 0) AS Cost,
-                        ISNULL(sa.Stock_Qty * sa.Stock_Cost, 0) AS Amount
+                        ISNULL(sa.Stock_Qty * sa.Stock_Cost, 0) AS Amount,
+                        ISNULL(RTRIM(sa.Stock_GL_Code), '') AS GLCode
                     FROM Stock_Adjustment sa
                     WHERE sa.Stock_Company_Name = @CompanyName
                     AND sa.Stock_REC_Type IN (10, 12)
@@ -196,10 +197,10 @@ namespace AOSmith.Controllers
                         var first = g.First();
                         var allRecTypes = g.Select(d => d.RecType).Distinct().OrderBy(r => r).ToList();
 
-                        // Merge approval counts across RecTypes
-                        var totalLevels = g.Sum(d => d.TotalLevels);
-                        var approvedCount = g.Sum(d => d.ApprovedCount);
-                        var rejectedCount = g.Sum(d => d.RejectedCount);
+                        // Use Max (not Sum) because both RecTypes share the same approval levels
+                        var totalLevels = g.Max(d => d.TotalLevels);
+                        var approvedCount = g.Max(d => d.ApprovedCount);
+                        var rejectedCount = g.Max(d => d.RejectedCount);
 
                         // NextPendingLevel: if any rejected → -1; if all fully approved → 0; else min pending
                         int nextPending;
@@ -564,7 +565,8 @@ namespace AOSmith.Controllers
                                 RTRIM(sa.Stock_To_Location) AS ToLocation,
                                 '' AS ToLocationName,
                                 sa.Stock_Qty AS Quantity,
-                                ISNULL(sa.Stock_Cost, 0) AS Cost
+                                ISNULL(sa.Stock_Cost, 0) AS Cost,
+                                ISNULL(RTRIM(sa.Stock_GL_Code), '') AS GLCode
                             FROM Stock_Adjustment sa
                             WHERE sa.Stock_Company_Name = @CompanyName
                             AND sa.Stock_FIN_Year = @FinYear

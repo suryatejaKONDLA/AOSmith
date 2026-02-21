@@ -59,6 +59,7 @@ namespace AOSmith.Models
         public decimal Quantity { get; set; }
         public decimal Cost { get; set; }
         public decimal Amount { get; set; }
+        public string GLCode { get; set; }
     }
 
     /// <summary>

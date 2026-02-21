@@ -11,6 +11,7 @@
     // Cached API data
     let cachedItems = [];
     let cachedLocations = [];
+    let cachedGLCodes = [];
     let itemsLoaded = false;
     let locationsLoaded = false;
 
@@ -22,6 +23,7 @@
         initializeEvents();
         loadMasterDataFromApi();
         loadDefaultAppLocation();
+        loadGLCodes();
     });
 
     // ==================== SPINNER HELPERS ====================
@@ -130,6 +132,33 @@
         });
     }
 
+    // Load GL Codes from database
+    function loadGLCodes()
+    {
+        $.ajax({
+            url: appBasePath + '/StockAdjustment/GetGLCodes',
+            type: 'GET',
+            success: function (response)
+            {
+                if (response.success && response.results) {
+                    cachedGLCodes = response.results;
+                    populateGLCodeDropdown(cachedGLCodes);
+                }
+            }
+        });
+    }
+
+    function populateGLCodeDropdown(codes)
+    {
+        var $select = $('#modalGLCode');
+        $select.empty();
+        $select.append('<option value="">-- Select GL Code --</option>');
+
+        $.each(codes, function (i, code) {
+            $select.append('<option value="' + escapeHtml(code.id) + '">' + escapeHtml(code.text) + '</option>');
+        });
+    }
+
     // Get display text for an item code from cached items
     function getItemDisplayText(itemCode)
     {
@@ -160,6 +189,9 @@
         if ($('#modalLocation').hasClass('select2-hidden-accessible')) {
             $('#modalLocation').select2('destroy');
         }
+        if ($('#modalGLCode').hasClass('select2-hidden-accessible')) {
+            $('#modalGLCode').select2('destroy');
+        }
 
         var $modal = $('#itemModal');
 
@@ -182,6 +214,14 @@
         $('#modalLocation').select2({
             theme: 'bootstrap-5',
             placeholder: '-- Select Location --',
+            allowClear: true,
+            dropdownParent: $modal,
+            width: '100%'
+        });
+
+        $('#modalGLCode').select2({
+            theme: 'bootstrap-5',
+            placeholder: '-- Select GL Code --',
             allowClear: true,
             dropdownParent: $modal,
             width: '100%'
@@ -327,6 +367,7 @@
                 '<td>' + escapeHtml(item.itemCode) + '</td>' +
                 '<td>' + escapeHtml(item.itemDescription) + '</td>' +
                 '<td>' + escapeHtml(item.locationName) + '</td>' +
+                '<td>' + escapeHtml(item.glCode || '') + '</td>' +
                 '<td>' + (item.stockOnHand ? parseFloat(item.stockOnHand).toFixed(3) : '0.000') + '</td>' +
                 '<td>' + item.qty.toFixed(3) + '</td>' +
                 '<td>' + (item.cost ? parseFloat(item.cost).toFixed(4) : '0.0000') + '</td>' +
@@ -351,7 +392,7 @@
             '<h6 class="fw-bold mb-3">Items (' + gridData.length + ')</h6>' +
             '<div class="table-responsive mb-4"><table class="table table-bordered table-sm">' +
             '<thead class="table-light"><tr>' +
-            '<th>Sr No</th><th>Adj Type</th><th>Item Code</th><th>Description</th><th>Location</th><th>Stock On Hand</th><th>Qty</th><th>Cost</th>' +
+            '<th>Sr No</th><th>Adj Type</th><th>Item Code</th><th>Description</th><th>Location</th><th>GL Code</th><th>Stock On Hand</th><th>Qty</th><th>Cost</th>' +
             '</tr></thead><tbody>' + itemsHtml + '</tbody></table></div>' +
             '<h6 class="fw-bold mb-3">Attachments (' + Object.keys(uploadedFiles).length + ')</h6>' +
             '<ul class="list-unstyled">' + filesHtml + '</ul>' +
@@ -389,6 +430,9 @@
         $('#modalAmount').val('');
         $('#modalStockOnHand').val('');
 
+        // Re-populate GL Code dropdown (since reset clears it)
+        populateGLCodeDropdown(cachedGLCodes);
+
         // Show modal first so Select2 can measure properly
         var myModal = new bootstrap.Modal(document.getElementById('itemModal'));
         myModal.show();
@@ -405,6 +449,7 @@
                 $('#modalRecType').val(item.recType).trigger('change');
                 $('#modalItemCode').val(item.itemCode).trigger('change');
                 $('#modalLocation').val(item.location).trigger('change');
+                $('#modalGLCode').val(item.glCode).trigger('change');
                 $('#modalQty').val(item.qty);
                 $('#modalItemDesc').val(item.itemDescription);
                 $('#modalCost').val(item.cost ? parseFloat(item.cost).toFixed(4) : '');
@@ -416,6 +461,7 @@
                 $('#modalRecType').val('').trigger('change');
                 $('#modalItemCode').val('').trigger('change');
                 $('#modalLocation').val('').trigger('change');
+                $('#modalGLCode').val('').trigger('change');
             }
         });
     }
@@ -535,6 +581,7 @@
         var itemDescription = $('#modalItemDesc').val();
         var location = $('#modalLocation').val();
         var locationName = getLocationDisplayText(location);
+        var glCode = $('#modalGLCode').val() || '';
         var qty = parseFloat($('#modalQty').val());
         var cost = $('#modalCost').val();
         var stockOnHand = $('#modalStockOnHand').val();
@@ -585,6 +632,7 @@
             fromLocationName: fromLocationName,
             toLocation: toLocation,
             toLocationName: toLocationName,
+            glCode: glCode,
             qty: qty,
             cost: cost,
             stockOnHand: stockOnHand
@@ -613,7 +661,7 @@
         tbody.empty();
 
         if (gridData.length === 0) {
-            tbody.append('<tr id="noDataRow"><td colspan="9" class="text-center text-muted">No items added yet. Click "Add Item" to begin.</td></tr>');
+            tbody.append('<tr id="noDataRow"><td colspan="11" class="text-center text-muted">No items added yet. Click "Add Item" to begin.</td></tr>');
             updateRateSummary();
             return;
         }
@@ -629,6 +677,7 @@
                 '<td>' + escapeHtml(item.itemCode) + '</td>' +
                 '<td>' + escapeHtml(item.itemDescription) + '</td>' +
                 '<td>' + escapeHtml(item.locationName) + '</td>' +
+                '<td>' + escapeHtml(item.glCode || '') + '</td>' +
                 '<td>' + stockOnHandDisplay + '</td>' +
                 '<td>' + item.qty.toFixed(3) + '</td>' +
                 '<td>' + costDisplay + '</td>' +
@@ -700,7 +749,8 @@
                 itemCode: item.itemCode,
                 itemDescription: item.itemDescription,
                 qty: item.qty,
-                cost: item.cost ? parseFloat(item.cost) : 0
+                cost: item.cost ? parseFloat(item.cost) : 0,
+                glCode: item.glCode || ''
             };
         })));
 
@@ -958,6 +1008,7 @@
                             fromLocationName: row.fromLocationName,
                             toLocation: row.toLocation,
                             toLocationName: row.toLocationName,
+                            glCode: row.glCode || '',
                             qty: row.qty,
                             cost: row.cost || '0'
                         });

@@ -10,5 +10,6 @@ namespace AOSmith.Models
         public string ItemDescription { get; set; }
         public decimal Qty { get; set; }
         public decimal Cost { get; set; }
+        public string GLCode { get; set; }
     }
 }

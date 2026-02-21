@@ -300,10 +300,12 @@
                 html += '<table class="table table-sm table-bordered line-items-table">';
                 html += '<thead><tr><th>#</th><th>Type</th><th>Item Code</th><th>Description</th><th>Location</th><th>Quantity</th><th class="text-end">Cost</th><th class="text-end">Amount</th></tr></thead>';
                 html += '<tbody>';
-                var totalAmount = 0;
+                var totalIncrease = 0;
+                var totalDecrease = 0;
                 $.each(doc.LineItems, function (i, item) {
                     var amt = parseFloat(item.Amount || 0);
-                    totalAmount += amt;
+                    if (item.RecType === 12) totalIncrease += amt;
+                    else totalDecrease += amt;
                     var typeBadge = item.RecType === 10
                         ? '<span class="badge bg-warning text-dark">Decrease</span>'
                         : '<span class="badge bg-info">Increase</span>';
@@ -318,8 +320,13 @@
                         '<td class="text-end">' + amt.toFixed(2) + '</td>' +
                         '</tr>';
                 });
+                var netAmount = totalIncrease - totalDecrease;
                 html += '</tbody>';
-                html += '<tfoot><tr><td colspan="7" class="text-end fw-bold">Total Amount:</td><td class="text-end fw-bold">' + totalAmount.toFixed(2) + '</td></tr></tfoot>';
+                html += '<tfoot>';
+                html += '<tr><td colspan="7" class="text-end fw-bold text-info">Total Increase:</td><td class="text-end fw-bold text-info">' + totalIncrease.toFixed(2) + '</td></tr>';
+                html += '<tr><td colspan="7" class="text-end fw-bold text-warning">Total Decrease:</td><td class="text-end fw-bold text-warning">' + totalDecrease.toFixed(2) + '</td></tr>';
+                html += '<tr class="table-dark"><td colspan="7" class="text-end fw-bold">Net Amount (Increase - Decrease):</td><td class="text-end fw-bold">' + netAmount.toFixed(2) + '</td></tr>';
+                html += '</tfoot>';
                 html += '</table>';
             }
 

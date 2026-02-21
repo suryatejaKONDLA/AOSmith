@@ -17,13 +17,4 @@ namespace AOSmith.Models
         public DateTime? AppApprovedDateTime { get; set; }
     }
 
-    public class RowAmountThreshold
-    {
-        public int RowId { get; set; }
-        public decimal RowAmount { get; set; }
-        public int? RowCreatedId { get; set; }
-        public DateTime? RowCreatedDate { get; set; }
-        public int? RowModifiedId { get; set; }
-        public DateTime? RowModifiedDate { get; set; }
-    }
 }

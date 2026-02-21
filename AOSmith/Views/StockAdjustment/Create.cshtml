@@ -55,21 +55,22 @@
                                 <table class="table table-bordered table-hover" id="itemsGrid">
                                     <thead class="thead-light">
                                         <tr>
-                                            <th style="width: 5%;">Sr No</th>
-                                            <th style="width: 13%;">Adjustment Type</th>
-                                            <th style="width: 10%;">Item Code</th>
-                                            <th style="width: 16%;">Item Description</th>
-                                            <th style="width: 10%;">Location</th>
-                                            <th style="width: 10%;">Stock On Hand</th>
-                                            <th style="width: 8%;">Qty</th>
-                                            <th style="width: 10%;">Cost</th>
-                                            <th style="width: 10%;">Amount</th>
-                                            <th style="width: 15%;">Action</th>
+                                            <th style="width: 4%;">Sr No</th>
+                                            <th style="width: 10%;">Adjustment Type</th>
+                                            <th style="width: 9%;">Item Code</th>
+                                            <th style="width: 14%;">Item Description</th>
+                                            <th style="width: 9%;">Location</th>
+                                            <th style="width: 9%;">GL Code</th>
+                                            <th style="width: 8%;">Stock On Hand</th>
+                                            <th style="width: 7%;">Qty</th>
+                                            <th style="width: 8%;">Cost</th>
+                                            <th style="width: 9%;">Amount</th>
+                                            <th style="width: 13%;">Action</th>
                                         </tr>
                                     </thead>
                                     <tbody id="itemsTableBody">
                                         <tr id="noDataRow">
-                                            <td colspan="10" class="text-center text-muted">No items added yet. Click "Add Item" to begin.</td>
+                                            <td colspan="11" class="text-center text-muted">No items added yet. Click "Add Item" to begin.</td>
                                         </tr>
                                     </tbody>
                                 </table>
@@ -198,6 +199,17 @@
                                 </select>
                             </div>
                         </div>
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label for="modalGLCode" class="form-label fw-semibold">GL Code <span class="text-danger">*</span></label>
+                                <select class="form-select" id="modalGLCode" name="GLCode" required>
+                                    <option value="">-- Loading GL Codes... --</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row g-3 mb-3">
                         <div class="col-md-2">
                             <div class="form-group">
                                 <label class="form-label fw-semibold">Stock On Hand</label>

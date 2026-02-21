@@ -639,3 +639,138 @@
 [2026-02-19 01:13:08] Subject: Stock Decrease Rejected at L1 - 202526/SMDAT/4
 [2026-02-19 01:13:13] EMAIL SENT SUCCESSFULLY to admin@aosmith.com
 [2026-02-19 01:13:13] SendRejectionEmail COMPLETE
+[2026-02-21 15:17:45] SendRecordCreatedEmail START - FinYear=202526, RecType=10, RecNumber=1, DocRef=202526/SMDAT/TRN/1
+[2026-02-21 15:17:45] Mail config loaded: Host=smtp.gmail.com, Port=587, From=cradleitl@gmail.com
+, SSL=True
+[2026-02-21 15:17:45] L1 approvers found: Hanmant Sharma <rupali@tresilient.com>
+[2026-02-21 15:17:45] Sending record-created email to Hanmant Sharma <rupali@tresilient.com>
+[2026-02-21 15:17:45] SMTP connecting: Host=smtp.gmail.com, Port=587, SSL=True, From=cradleitl@gmail.com
+, To=rupali@tresilient.com
+[2026-02-21 15:17:45] Subject: New Stock Decrease Pending Approval - 202526/SMDAT/TRN/1
+[2026-02-21 15:17:49] EMAIL SENT SUCCESSFULLY to rupali@tresilient.com
+[2026-02-21 15:17:49] SendRecordCreatedEmail COMPLETE
+[2026-02-21 15:17:54] SendRecordCreatedEmail START - FinYear=202526, RecType=12, RecNumber=1, DocRef=202526/SMDAT/ADJ/1
+[2026-02-21 15:17:54] Mail config loaded: Host=smtp.gmail.com, Port=587, From=cradleitl@gmail.com
+, SSL=True
+[2026-02-21 15:17:54] L1 approvers found: Hanmant Sharma <rupali@tresilient.com>
+[2026-02-21 15:17:54] Sending record-created email to Hanmant Sharma <rupali@tresilient.com>
+[2026-02-21 15:17:54] SMTP connecting: Host=smtp.gmail.com, Port=587, SSL=True, From=cradleitl@gmail.com
+, To=rupali@tresilient.com
+[2026-02-21 15:17:54] Subject: New Stock Increase Pending Approval - 202526/SMDAT/ADJ/1
+[2026-02-21 15:17:58] EMAIL SENT SUCCESSFULLY to rupali@tresilient.com
+[2026-02-21 15:17:58] SendRecordCreatedEmail COMPLETE
+[2026-02-21 15:18:30] SendRecordCreatedEmail START - FinYear=202526, RecType=10, RecNumber=1, DocRef=202526/SMDAT/TRN/1
+[2026-02-21 15:18:30] Mail config loaded: Host=smtp.gmail.com, Port=587, From=cradleitl@gmail.com
+, SSL=True
+[2026-02-21 15:18:30] L1 approvers found: Hanmant Sharma <rupali@tresilient.com>
+[2026-02-21 15:18:30] Sending record-created email to Hanmant Sharma <rupali@tresilient.com>
+[2026-02-21 15:18:30] SMTP connecting: Host=smtp.gmail.com, Port=587, SSL=True, From=cradleitl@gmail.com
+, To=rupali@tresilient.com
+[2026-02-21 15:18:30] Subject: New Stock Decrease Pending Approval - 202526/SMDAT/TRN/1
+[2026-02-21 15:18:34] EMAIL SENT SUCCESSFULLY to rupali@tresilient.com
+[2026-02-21 15:18:34] SendRecordCreatedEmail COMPLETE
+[2026-02-21 15:18:38] SendRecordCreatedEmail START - FinYear=202526, RecType=12, RecNumber=1, DocRef=202526/SMDAT/ADJ/1
+[2026-02-21 15:18:38] Mail config loaded: Host=smtp.gmail.com, Port=587, From=cradleitl@gmail.com
+, SSL=True
+[2026-02-21 15:18:38] L1 approvers found: Hanmant Sharma <rupali@tresilient.com>
+[2026-02-21 15:18:38] Sending record-created email to Hanmant Sharma <rupali@tresilient.com>
+[2026-02-21 15:18:38] SMTP connecting: Host=smtp.gmail.com, Port=587, SSL=True, From=cradleitl@gmail.com
+, To=rupali@tresilient.com
+[2026-02-21 15:18:38] Subject: New Stock Increase Pending Approval - 202526/SMDAT/ADJ/1
+[2026-02-21 15:18:41] EMAIL SENT SUCCESSFULLY to rupali@tresilient.com
+[2026-02-21 15:18:41] SendRecordCreatedEmail COMPLETE
+[2026-02-21 15:27:16] SendApprovalEmailToNextLevel START - DocRef=202526/SMDAT/1, ApprovedLevel=1
+[2026-02-21 15:27:16] L2 approvers: Rakesh Patel <cradleitl@gmail.com>
+[2026-02-21 15:27:16] Sending approval-next-level email to Rakesh Patel <cradleitl@gmail.com>
+[2026-02-21 15:27:16] SMTP connecting: Host=smtp.gmail.com, Port=587, SSL=True, From=cradleitl@gmail.com
+, To=cradleitl@gmail.com
+[2026-02-21 15:27:16] Subject: Stock Decrease Approved at L1 - Pending Your Approval - 202526/SMDAT/1
+[2026-02-21 15:27:20] EMAIL SENT SUCCESSFULLY to cradleitl@gmail.com
+[2026-02-21 15:27:20] SendApprovalEmailToNextLevel COMPLETE
+[2026-02-21 15:27:52] SendApprovalEmailToNextLevel START - DocRef=202526/SMDAT/1, ApprovedLevel=2
+[2026-02-21 15:27:52] L3 approvers: Siva Verma <kondla.suryateja1206@gmail.com>
+[2026-02-21 15:27:52] Sending approval-next-level email to Siva Verma <kondla.suryateja1206@gmail.com>
+[2026-02-21 15:27:52] SMTP connecting: Host=smtp.gmail.com, Port=587, SSL=True, From=cradleitl@gmail.com
+, To=kondla.suryateja1206@gmail.com
+[2026-02-21 15:27:52] Subject: Stock Decrease Approved at L2 - Pending Your Approval - 202526/SMDAT/1
+[2026-02-21 15:27:56] EMAIL SENT SUCCESSFULLY to kondla.suryateja1206@gmail.com
+[2026-02-21 15:27:56] SendApprovalEmailToNextLevel COMPLETE
+[2026-02-21 15:28:33] SendApprovalEmailToNextLevel START - DocRef=202526/SMDAT/1, ApprovedLevel=3
+[2026-02-21 15:28:33] L4 approvers: Rahul Gupta <sneha@aosmith.com>
+[2026-02-21 15:28:33] Sending approval-next-level email to Rahul Gupta <sneha@aosmith.com>
+[2026-02-21 15:28:33] SMTP connecting: Host=smtp.gmail.com, Port=587, SSL=True, From=cradleitl@gmail.com
+, To=sneha@aosmith.com
+[2026-02-21 15:28:33] Subject: Stock Decrease Approved at L3 - Pending Your Approval - 202526/SMDAT/1
+[2026-02-21 15:28:38] EMAIL SENT SUCCESSFULLY to sneha@aosmith.com
+[2026-02-21 15:28:38] SendApprovalEmailToNextLevel COMPLETE
+[2026-02-21 15:29:34] SendFullyApprovedEmail START - DocRef=202526/SMDAT/1
+[2026-02-21 15:29:34] Creator: ADMINISTRATOR <admin@aosmith.com>
+[2026-02-21 15:29:34] SMTP connecting: Host=smtp.gmail.com, Port=587, SSL=True, From=cradleitl@gmail.com
+, To=admin@aosmith.com
+[2026-02-21 15:29:34] Subject: Stock Decrease Fully Approved - 202526/SMDAT/1
+[2026-02-21 15:29:37] EMAIL SENT SUCCESSFULLY to admin@aosmith.com
+[2026-02-21 15:29:38] SendFullyApprovedEmail COMPLETE
+[2026-02-21 15:46:02] SendRecordCreatedEmail START - FinYear=202526, RecType=0, RecNumber=2, DocRef=202526/SMDAT/TRN/2
+[2026-02-21 15:46:02] Mail config loaded: Host=smtp.gmail.com, Port=587, From=cradleitl@gmail.com
+, SSL=True
+[2026-02-21 15:46:02] L1 approvers found: Hanmant Sharma <rupali@tresilient.com>
+[2026-02-21 15:46:02] Sending record-created email to Hanmant Sharma <rupali@tresilient.com>
+[2026-02-21 15:46:02] SMTP connecting: Host=smtp.gmail.com, Port=587, SSL=True, From=cradleitl@gmail.com
+, To=rupali@tresilient.com
+[2026-02-21 15:46:02] Subject: New Stock Adjustment Pending Approval - 202526/SMDAT/TRN/2
+[2026-02-21 15:46:06] EMAIL SENT SUCCESSFULLY to rupali@tresilient.com
+[2026-02-21 15:46:06] SendRecordCreatedEmail COMPLETE
+[2026-02-21 15:47:16] SendApprovalEmailToNextLevel START - DocRef=202526/SMDAT/2, ApprovedLevel=1
+[2026-02-21 15:47:16] L2 approvers: Rakesh Patel <cradleitl@gmail.com>
+[2026-02-21 15:47:16] Sending approval-next-level email to Rakesh Patel <cradleitl@gmail.com>
+[2026-02-21 15:47:16] SMTP connecting: Host=smtp.gmail.com, Port=587, SSL=True, From=cradleitl@gmail.com
+, To=cradleitl@gmail.com
+[2026-02-21 15:47:16] Subject: Stock Adjustment Approved at L1 - Pending Your Approval - 202526/SMDAT/2
+[2026-02-21 15:47:19] EMAIL SENT SUCCESSFULLY to cradleitl@gmail.com
+[2026-02-21 15:47:20] SendApprovalEmailToNextLevel COMPLETE
+[2026-02-21 15:47:59] SendRejectionEmail START - DocRef=202526/SMDAT/2, RejectedAtLevel=2
+[2026-02-21 15:47:59] Rejection recipients: Hanmant Sharma <rupali@tresilient.com>, Rupali <support@tresilient.com>
+[2026-02-21 15:47:59] Sending rejection email to Hanmant Sharma <rupali@tresilient.com>
+[2026-02-21 15:47:59] SMTP connecting: Host=smtp.gmail.com, Port=587, SSL=True, From=cradleitl@gmail.com
+, To=rupali@tresilient.com
+[2026-02-21 15:47:59] Subject: Stock Adjustment Rejected at L2 - 202526/SMDAT/2
+[2026-02-21 15:48:02] EMAIL SENT SUCCESSFULLY to rupali@tresilient.com
+[2026-02-21 15:48:03] Sending rejection email to Rupali <support@tresilient.com>
+[2026-02-21 15:48:03] SMTP connecting: Host=smtp.gmail.com, Port=587, SSL=True, From=cradleitl@gmail.com
+, To=support@tresilient.com
+[2026-02-21 15:48:03] Subject: Stock Adjustment Rejected at L2 - 202526/SMDAT/2
+[2026-02-21 15:48:06] EMAIL SENT SUCCESSFULLY to support@tresilient.com
+[2026-02-21 15:48:07] SendRejectionEmail COMPLETE
+[2026-02-21 16:08:33] SendRecordCreatedEmail START - FinYear=202526, RecType=0, RecNumber=4, DocRef=202526/SMDAT/TRN/4
+[2026-02-21 16:08:33] Mail config loaded: Host=smtp.gmail.com, Port=587, From=cradleitl@gmail.com
+, SSL=True
+[2026-02-21 16:08:33] L1 approvers found: Hanmant Sharma <rupali@tresilient.com>
+[2026-02-21 16:08:33] Sending record-created email to Hanmant Sharma <rupali@tresilient.com>
+[2026-02-21 16:08:33] SMTP connecting: Host=smtp.gmail.com, Port=587, SSL=True, From=cradleitl@gmail.com
+, To=rupali@tresilient.com
+[2026-02-21 16:08:33] Subject: New Stock Adjustment Pending Approval - 202526/SMDAT/TRN/4
+[2026-02-21 16:08:38] EMAIL SENT SUCCESSFULLY to rupali@tresilient.com
+[2026-02-21 16:08:38] SendRecordCreatedEmail COMPLETE
+[2026-02-21 16:09:32] SendApprovalEmailToNextLevel START - DocRef=202526/SMDAT/4, ApprovedLevel=1
+[2026-02-21 16:09:32] L2 approvers: Rakesh Patel <cradleitl@gmail.com>
+[2026-02-21 16:09:32] Sending approval-next-level email to Rakesh Patel <cradleitl@gmail.com>
+[2026-02-21 16:09:32] SMTP connecting: Host=smtp.gmail.com, Port=587, SSL=True, From=cradleitl@gmail.com
+, To=cradleitl@gmail.com
+[2026-02-21 16:09:32] Subject: Stock Adjustment Approved at L1 - Pending Your Approval - 202526/SMDAT/4
+[2026-02-21 16:09:36] EMAIL SENT SUCCESSFULLY to cradleitl@gmail.com
+[2026-02-21 16:09:36] SendApprovalEmailToNextLevel COMPLETE
+[2026-02-21 16:09:59] SendApprovalEmailToNextLevel START - DocRef=202526/SMDAT/4, ApprovedLevel=2
+[2026-02-21 16:09:59] L3 approvers: Siva Verma <kondla.suryateja1206@gmail.com>
+[2026-02-21 16:09:59] Sending approval-next-level email to Siva Verma <kondla.suryateja1206@gmail.com>
+[2026-02-21 16:09:59] SMTP connecting: Host=smtp.gmail.com, Port=587, SSL=True, From=cradleitl@gmail.com
+, To=kondla.suryateja1206@gmail.com
+[2026-02-21 16:09:59] Subject: Stock Adjustment Approved at L2 - Pending Your Approval - 202526/SMDAT/4
+[2026-02-21 16:10:03] EMAIL SENT SUCCESSFULLY to kondla.suryateja1206@gmail.com
+[2026-02-21 16:10:03] SendApprovalEmailToNextLevel COMPLETE
+[2026-02-21 16:10:38] SendFullyApprovedEmail START - DocRef=202526/SMDAT/4
+[2026-02-21 16:10:38] Creator: Rupali <support@tresilient.com>
+[2026-02-21 16:10:38] SMTP connecting: Host=smtp.gmail.com, Port=587, SSL=True, From=cradleitl@gmail.com
+, To=support@tresilient.com
+[2026-02-21 16:10:38] Subject: Stock Adjustment Fully Approved - 202526/SMDAT/4
+[2026-02-21 16:10:42] EMAIL SENT SUCCESSFULLY to support@tresilient.com
+[2026-02-21 16:10:42] SendFullyApprovedEmail COMPLETE

@@ -632,6 +632,21 @@ namespace AOSmith.Controllers
             }
         }
 
+        [HttpGet]
+        public async Task<JsonResult> GetGLCodes()
+        {
+            try
+            {
+                var codes = await _dbHelper.QueryAsync<dynamic>("SELECT GL_Code FROM GL_Codes ORDER BY GL_Code");
+                var results = codes.Select(c => new { id = (string)c.GL_Code, text = (string)c.GL_Code }).ToList();
+                return Json(new { success = true, results }, JsonRequestBehavior.AllowGet);
+            }
+            catch (Exception ex)
+            {
+                return Json(new { success = false, message = ex.Message }, JsonRequestBehavior.AllowGet);
+            }
+        }
+
         [HttpPost]
         public async Task<JsonResult> SaveStockAdjustment()
         {
@@ -671,10 +686,108 @@ namespace AOSmith.Controllers
                 var errorMessages = new List<string>();
                 var sageResponses = new List<object>();
 
+                // ============ APPROVAL LEVEL CALCULATION ============
+                // Threshold Types: 1=Line Increase, 2=Line Decrease, 3=Total Increase, 4=Total Decrease
+                var thresholds = (await _dbHelper.QueryAsync<ApprovalAmountThreshold>(
+                    @"SELECT Threshold_ID AS ThresholdId, Threshold_Type AS ThresholdType,
+                             Threshold_Level AS ThresholdLevel,
+                             Threshold_Min_Amount AS ThresholdMinAmount,
+                             Threshold_Max_Amount AS ThresholdMaxAmount
+                      FROM Approval_Amount_Threshold
+                      ORDER BY Threshold_Type, Threshold_Level")).ToList();
+
+                int approvalLevelOverride = 0;
+                int lineLevel = 0;
+
+                // Step 1: Check each line item against Line-wise thresholds
+                foreach (var item in lineItems)
+                {
+                    var itemAmount = item.Qty * item.Cost;
+                    // RecType 12 = Increase → Line Increase (type 1)
+                    // RecType 10 = Decrease → Line Decrease (type 2)
+                    int lineThresholdType = item.RecType == 12 ? 1 : 2;
+                    var lineThresholds = thresholds.Where(t => t.ThresholdType == lineThresholdType).ToList();
+
+                    foreach (var t in lineThresholds)
+                    {
+                        if (itemAmount >= t.ThresholdMinAmount && (t.ThresholdMaxAmount == 0 || itemAmount <= t.ThresholdMaxAmount))
+                        {
+                            if (t.ThresholdLevel > lineLevel)
+                                lineLevel = t.ThresholdLevel;
+                        }
+                        // If amount exceeds the highest configured max, it's the highest level
+                        if (t.ThresholdMaxAmount > 0 && itemAmount > t.ThresholdMaxAmount && t.ThresholdLevel > lineLevel)
+                            lineLevel = t.ThresholdLevel;
+                    }
+                    // If amount exceeds ALL configured thresholds, find the highest level
+                    if (lineThresholds.Any() && itemAmount > lineThresholds.Max(t => t.ThresholdMaxAmount))
+                    {
+                        var maxLevel = lineThresholds.Max(t => t.ThresholdLevel);
+                        if (maxLevel > lineLevel)
+                            lineLevel = maxLevel;
+                    }
+                }
+
+                if (lineLevel > 1)
+                {
+                    // A line item breached beyond L1 → use line-level determination
+                    approvalLevelOverride = lineLevel;
+                }
+                else
+                {
+                    // Step 2: No line item crossed beyond L1 → check totals
+                    int totalLevel = 0;
+
+                    // Total Increase (type 3) — sum of all RecType 12 items
+                    var totalIncrease = lineItems.Where(x => x.RecType == 12).Sum(x => x.Qty * x.Cost);
+                    if (totalIncrease > 0)
+                    {
+                        var totalIncThresholds = thresholds.Where(t => t.ThresholdType == 3).ToList();
+                        foreach (var t in totalIncThresholds)
+                        {
+                            if (totalIncrease >= t.ThresholdMinAmount && (t.ThresholdMaxAmount == 0 || totalIncrease <= t.ThresholdMaxAmount))
+                            {
+                                if (t.ThresholdLevel > totalLevel)
+                                    totalLevel = t.ThresholdLevel;
+                            }
+                        }
+                        if (totalIncThresholds.Any() && totalIncrease > totalIncThresholds.Max(t => t.ThresholdMaxAmount))
+                        {
+                            var maxLevel = totalIncThresholds.Max(t => t.ThresholdLevel);
+                            if (maxLevel > totalLevel)
+                                totalLevel = maxLevel;
+                        }
+                    }
+
+                    // Total Decrease (type 4) — sum of all RecType 10 items
+                    var totalDecrease = lineItems.Where(x => x.RecType == 10).Sum(x => x.Qty * x.Cost);
+                    if (totalDecrease > 0)
+                    {
+                        var totalDecThresholds = thresholds.Where(t => t.ThresholdType == 4).ToList();
+                        foreach (var t in totalDecThresholds)
+                        {
+                            if (totalDecrease >= t.ThresholdMinAmount && (t.ThresholdMaxAmount == 0 || totalDecrease <= t.ThresholdMaxAmount))
+                            {
+                                if (t.ThresholdLevel > totalLevel)
+                                    totalLevel = t.ThresholdLevel;
+                            }
+                        }
+                        if (totalDecThresholds.Any() && totalDecrease > totalDecThresholds.Max(t => t.ThresholdMaxAmount))
+                        {
+                            var maxLevel = totalDecThresholds.Max(t => t.ThresholdLevel);
+                            if (maxLevel > totalLevel)
+                                totalLevel = maxLevel;
+                        }
+                    }
+
+                    approvalLevelOverride = totalLevel;
+                }
+
                 // The SP generates the record number on first call (when 0 is passed).
                 // Subsequent calls reuse the same number so all RecTypes share one record.
                 int recordNumber = 0;
                 int finYear = 0;
+                string firstDocumentReference = null;
 
                 // Process each RecType group as a separate transaction
                 foreach (var group in groupedByRecType)
@@ -733,6 +846,10 @@ namespace AOSmith.Controllers
                         new System.Data.SqlClient.SqlParameter("@Session_ID", System.Data.SqlDbType.Int)
                         {
                             Value = sessionId
+                        },
+                        new System.Data.SqlClient.SqlParameter("@ApprovalLevelOverride", System.Data.SqlDbType.Int)
+                        {
+                            Value = approvalLevelOverride
                         }
                     };
 
@@ -755,13 +872,7 @@ namespace AOSmith.Controllers
 
                         var recNumber = recordNumber;
                         var documentReference = ExtractDocumentReference(result.ResultMessage);
-
-                        // Send email notification to L1 approver (non-blocking)
-                        try
-                        {
-                            await _emailService.SendRecordCreatedEmailAsync(finYear, recType, recNumber, documentReference);
-                        }
-                        catch { /* email failure should not break save */ }
+                        if (firstDocumentReference == null) firstDocumentReference = documentReference;
 
                         // RecType 10 (Stock Decrease) → send to Sage Transfer Entry immediately
                         if (recType == 10)
@@ -929,6 +1040,13 @@ namespace AOSmith.Controllers
                     else
                         consolidatedMessage = successMessages[0];
 
+                    // Send a single combined email notification to L1 approver
+                    try
+                    {
+                        await _emailService.SendRecordCreatedEmailAsync(finYear, 0, recordNumber, firstDocumentReference ?? consolidatedMessage);
+                    }
+                    catch { /* email failure should not break save */ }
+
                     return Json(new
                     {
                         success = true,
@@ -1011,6 +1129,7 @@ namespace AOSmith.Controllers
             table.Columns.Add("StockItemCode", typeof(string));
             table.Columns.Add("StockQty", typeof(decimal));
             table.Columns.Add("StockCost", typeof(decimal));
+            table.Columns.Add("StockGLCode", typeof(string));
 
             foreach (var item in lineItems)
             {
@@ -1020,7 +1139,8 @@ namespace AOSmith.Controllers
                     item.ToLocation?.Trim() ?? string.Empty,
                     item.ItemCode?.Trim() ?? string.Empty,
                     item.Qty,
-                    item.Cost
+                    item.Cost,
+                    item.GLCode?.Trim() ?? string.Empty
                 );
             }
 

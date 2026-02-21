@@ -218,10 +218,10 @@ namespace AOSmith.Controllers
                         var first = g.First();
                         var allRecTypes = g.Select(d => d.RecType).Distinct().OrderBy(r => r).ToList();
 
-                        // Merge approval counts across RecTypes
-                        var totalLevels = g.Sum(d => d.TotalLevels);
-                        var approvedCount = g.Sum(d => d.ApprovedCount);
-                        var rejectedCount = g.Sum(d => d.RejectedCount);
+                        // Use Max (not Sum) because both RecTypes share the same approval levels
+                        var totalLevels = g.Max(d => d.TotalLevels);
+                        var approvedCount = g.Max(d => d.ApprovedCount);
+                        var rejectedCount = g.Max(d => d.RejectedCount);
 
                         // NextPendingLevel: if any rejected -> -1; if all fully approved -> 0; else min pending
                         int nextPending;

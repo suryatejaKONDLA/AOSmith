@@ -337,7 +337,7 @@ namespace AOSmith.Services
                     Location = item.RecType == 12
                         ? item.ToLocation?.Trim()
                         : (!string.IsNullOrEmpty(defaultLocation) ? defaultLocation : item.FromLocation?.Trim()),
-                    WoffAcct = "",
+                    WoffAcct = item.GLCode?.Trim() ?? "",
                     Quantity = item.Quantity,
                     ExtCost = item.Cost * item.Quantity,
                     TransType = item.RecType == 12 ? 5 : 6

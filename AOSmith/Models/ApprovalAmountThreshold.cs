@@ -12,10 +12,12 @@ namespace AOSmith.Models
 
     /// <summary>
     /// Model for displaying threshold data (includes approver name from JOIN)
+    /// ThresholdType: 1=Line Increase, 2=Line Decrease, 3=Total Increase, 4=Total Decrease
     /// </summary>
     public class ApprovalAmountThreshold
     {
         public int ThresholdId { get; set; }
+        public int ThresholdType { get; set; }
         public int ThresholdLevel { get; set; }
         public decimal ThresholdMinAmount { get; set; }
         public decimal ThresholdMaxAmount { get; set; }
@@ -26,9 +28,11 @@ namespace AOSmith.Models
 
     /// <summary>
     /// Line item for saving thresholds via TVP (level + amounts only)
+    /// ThresholdType: 1=Line Increase, 2=Line Decrease, 3=Total Increase, 4=Total Decrease
     /// </summary>
     public class ApprovalAmountThresholdLineItem
     {
+        public int ThresholdType { get; set; }
         public int ThresholdLevel { get; set; }
         public decimal ThresholdMinAmount { get; set; }
         public decimal ThresholdMaxAmount { get; set; }

@@ -85,11 +85,14 @@ namespace AOSmith.Services
         /// </summary>
         private async Task<ApproverInfo> GetDocumentCreatorAsync(int finYear, int recType, int recNumber)
         {
-            var query = @"SELECT TOP 1 lm.Login_ID AS UserId, lm.Login_Name AS Name,
+            var recTypeFilter = (recType == 10 || recType == 12 || recType == 0)
+                ? "sa.Stock_REC_Type IN (10, 12)"
+                : "sa.Stock_REC_Type = @RecType";
+            var query = $@"SELECT TOP 1 lm.Login_ID AS UserId, lm.Login_Name AS Name,
                           lm.Login_Email_ID AS Email, ISNULL(lm.Login_Approval_Level, 0) AS ApprovalLevel
                           FROM Stock_Adjustment sa
                           INNER JOIN Login_Master lm ON sa.Stock_Created_ID = lm.Login_ID
-                          WHERE sa.Stock_FIN_Year = @FinYear AND sa.Stock_REC_Type = @RecType
+                          WHERE sa.Stock_FIN_Year = @FinYear AND {recTypeFilter}
                           AND sa.Stock_REC_Number = @RecNumber";
             var parameters = new Dictionary<string, object>
             {
@@ -105,16 +108,20 @@ namespace AOSmith.Services
         /// </summary>
         private async Task<List<EmailLineItem>> GetLineItemsAsync(int finYear, int recType, int recNumber)
         {
-            var query = @"SELECT
+            var recTypeFilter = (recType == 10 || recType == 12 || recType == 0)
+                ? "sa.Stock_REC_Type IN (10, 12)"
+                : "sa.Stock_REC_Type = @RecType";
+            var query = $@"SELECT
                             sa.Stock_REC_SNO AS Sno,
+                            sa.Stock_REC_Type AS RecType,
                             RTRIM(sa.Stock_Item_Code) AS ItemCode,
                             RTRIM(sa.Stock_From_Location) AS FromLocation,
                             RTRIM(sa.Stock_To_Location) AS ToLocation,
                             sa.Stock_Qty AS Quantity
                           FROM Stock_Adjustment sa
-                          WHERE sa.Stock_FIN_Year = @FinYear AND sa.Stock_REC_Type = @RecType
+                          WHERE sa.Stock_FIN_Year = @FinYear AND {recTypeFilter}
                           AND sa.Stock_REC_Number = @RecNumber
-                          ORDER BY sa.Stock_REC_SNO";
+                          ORDER BY sa.Stock_REC_Type, sa.Stock_REC_SNO";
             var parameters = new Dictionary<string, object>
             {
                 { "@FinYear", finYear },
@@ -205,7 +212,7 @@ namespace AOSmith.Services
                 var lineItems = await GetLineItemsAsync(finYear, recType, recNumber);
                 await ResolveNamesAsync(lineItems);
 
-                var recTypeName = recType == 10 ? "Stock Decrease" : recType == 12 ? "Stock Increase" : "Stock Adjustment";
+                var recTypeName = GetRecTypeName(recType, lineItems);
                 var subject = $"New {recTypeName} Pending Approval - {documentReference}";
 
                 var body = BuildHtmlBody(
@@ -260,7 +267,7 @@ namespace AOSmith.Services
                 var lineItems = await GetLineItemsAsync(finYear, recType, recNumber);
                 await ResolveNamesAsync(lineItems);
 
-                var recTypeName = recType == 10 ? "Stock Decrease" : recType == 12 ? "Stock Increase" : "Stock Adjustment";
+                var recTypeName = GetRecTypeName(recType, lineItems);
                 var subject = $"{recTypeName} Approved at L{approvedLevel} - Pending Your Approval - {documentReference}";
 
                 var body = BuildHtmlBody(
@@ -327,7 +334,7 @@ namespace AOSmith.Services
                 var lineItems = await GetLineItemsAsync(finYear, recType, recNumber);
                 await ResolveNamesAsync(lineItems);
 
-                var recTypeName = recType == 10 ? "Stock Decrease" : recType == 12 ? "Stock Increase" : "Stock Adjustment";
+                var recTypeName = GetRecTypeName(recType, lineItems);
                 var subject = $"{recTypeName} Rejected at L{rejectedAtLevel} - {documentReference}";
 
                 var remarksHtml = !string.IsNullOrWhiteSpace(remarks)
@@ -382,7 +389,7 @@ namespace AOSmith.Services
                 var lineItems = await GetLineItemsAsync(finYear, recType, recNumber);
                 await ResolveNamesAsync(lineItems);
 
-                var recTypeName = recType == 10 ? "Stock Decrease" : recType == 12 ? "Stock Increase" : "Stock Adjustment";
+                var recTypeName = GetRecTypeName(recType, lineItems);
                 var subject = $"{recTypeName} Fully Approved - {documentReference}";
 
                 var body = BuildHtmlBody(
@@ -403,6 +410,25 @@ namespace AOSmith.Services
             {
                 Log($"SendFullyApprovedEmail ERROR: {ex}");
             }
+        }
+
+        // ==================== HELPERS ====================
+
+        private static string GetRecTypeName(int recType, List<EmailLineItem> lineItems)
+        {
+            if (recType == 14) return "Stock Reverse";
+            // If line items contain both types, or recType is 0 (combined), use "Stock Adjustment"
+            if (recType == 0 || (lineItems != null && lineItems.Select(l => l.RecType).Distinct().Count() > 1))
+                return "Stock Adjustment";
+            if (recType == 10) return "Stock Decrease";
+            if (recType == 12) return "Stock Increase";
+            // If lineItems all share one recType, use that
+            if (lineItems != null && lineItems.Any())
+            {
+                var singleType = lineItems.First().RecType;
+                return singleType == 10 ? "Stock Decrease" : singleType == 12 ? "Stock Increase" : "Stock Adjustment";
+            }
+            return "Stock Adjustment";
         }
 
         // ==================== HTML BODY BUILDER ====================
@@ -450,6 +476,8 @@ namespace AOSmith.Services
             // Line items table
             if (lineItems != null && lineItems.Any())
             {
+                var hasMultipleTypes = lineItems.Select(l => l.RecType).Distinct().Count() > 1;
+
                 sb.AppendLine("<tr><td style='padding:0 30px 20px;'>");
                 sb.AppendLine("<div style='font-size:14px; font-weight:bold; color:#004d26; margin-bottom:8px;'>Item Details</div>");
                 sb.AppendLine("<table width='100%' cellpadding='0' cellspacing='0' style='border-collapse:collapse; font-size:13px;'>");
@@ -457,6 +485,8 @@ namespace AOSmith.Services
                 // Table header
                 sb.AppendLine("<tr style='background-color:#004d26; color:#ffffff;'>");
                 sb.AppendLine("<th style='padding:8px 10px; text-align:left; border:1px solid #003d1f;'>Sr</th>");
+                if (hasMultipleTypes)
+                    sb.AppendLine("<th style='padding:8px 10px; text-align:left; border:1px solid #003d1f;'>Type</th>");
                 sb.AppendLine("<th style='padding:8px 10px; text-align:left; border:1px solid #003d1f;'>Item Code</th>");
                 sb.AppendLine("<th style='padding:8px 10px; text-align:left; border:1px solid #003d1f;'>Item Name</th>");
                 sb.AppendLine("<th style='padding:8px 10px; text-align:left; border:1px solid #003d1f;'>Location</th>");
@@ -467,6 +497,7 @@ namespace AOSmith.Services
                 // Table rows
                 int sr = 0;
                 decimal totalCost = 0;
+                int colSpan = hasMultipleTypes ? 5 : 4;
                 foreach (var item in lineItems)
                 {
                     sr++;
@@ -478,8 +509,17 @@ namespace AOSmith.Services
                     var lineCost = item.Cost * item.Quantity;
                     totalCost += lineCost;
 
+                    var typeBadge = "";
+                    if (hasMultipleTypes)
+                    {
+                        var typeLabel = item.RecType == 12 ? "Increase" : item.RecType == 10 ? "Decrease" : "Reverse";
+                        var typeColor = item.RecType == 12 ? "#198754" : item.RecType == 10 ? "#dc3545" : "#6c757d";
+                        typeBadge = $"<td style='padding:6px 10px; border:1px solid #dee2e6;'><span style='background-color:{typeColor};color:#fff;padding:2px 8px;border-radius:3px;font-size:11px;'>{typeLabel}</span></td>";
+                    }
+
                     sb.AppendLine($"<tr style='background-color:{bgColor};'>");
                     sb.AppendLine($"<td style='padding:6px 10px; border:1px solid #dee2e6;'>{sr}</td>");
+                    if (hasMultipleTypes) sb.AppendLine(typeBadge);
                     sb.AppendLine($"<td style='padding:6px 10px; border:1px solid #dee2e6;'>{item.ItemCode}</td>");
                     sb.AppendLine($"<td style='padding:6px 10px; border:1px solid #dee2e6;'>{item.ItemName}</td>");
                     sb.AppendLine($"<td style='padding:6px 10px; border:1px solid #dee2e6;'>{locationDisplay}</td>");
@@ -490,7 +530,7 @@ namespace AOSmith.Services
 
                 // Total row
                 sb.AppendLine("<tr style='background-color:#e8f5e9; font-weight:bold;'>");
-                sb.AppendLine($"<td colspan='4' style='padding:8px 10px; border:1px solid #dee2e6; text-align:right;'>Total</td>");
+                sb.AppendLine($"<td colspan='{colSpan}' style='padding:8px 10px; border:1px solid #dee2e6; text-align:right;'>Total</td>");
                 sb.AppendLine($"<td style='padding:8px 10px; border:1px solid #dee2e6; text-align:right;'>{lineItems.Sum(x => x.Quantity):N2}</td>");
                 sb.AppendLine($"<td style='padding:8px 10px; border:1px solid #dee2e6; text-align:right;'>{totalCost:N2}</td>");
                 sb.AppendLine("</tr>");
@@ -561,6 +601,7 @@ namespace AOSmith.Services
     public class EmailLineItem
     {
         public int Sno { get; set; }
+        public int RecType { get; set; }
         public string ItemCode { get; set; }
         public string ItemName { get; set; }
         public string FromLocation { get; set; }

@@ -178,6 +178,7 @@ namespace AOSmith.Controllers
             try
             {
                 const string sql = @"SELECT t.Threshold_ID AS ThresholdId,
+                                            t.Threshold_Type AS ThresholdType,
                                             t.Threshold_Level AS ThresholdLevel,
                                             t.Threshold_Min_Amount AS ThresholdMinAmount,
                                             t.Threshold_Max_Amount AS ThresholdMaxAmount,
@@ -185,7 +186,7 @@ namespace AOSmith.Controllers
                                      FROM Approval_Amount_Threshold t
                                      LEFT JOIN Login_Master lm ON lm.Login_Approval_Level = t.Threshold_Level
                                                                   AND lm.Login_Is_Approver = 1
-                                     ORDER BY t.Threshold_Level";
+                                     ORDER BY t.Threshold_Type, t.Threshold_Level";
 
                 var thresholds = (await _dbHelper.QueryAsync<ApprovalAmountThreshold>(sql)).ToList();
 
@@ -220,13 +221,14 @@ namespace AOSmith.Controllers
 
                 // Build DataTable for TVP
                 var table = new DataTable();
+                table.Columns.Add("ThresholdType", typeof(int));
                 table.Columns.Add("ThresholdLevel", typeof(int));
                 table.Columns.Add("ThresholdMinAmount", typeof(decimal));
                 table.Columns.Add("ThresholdMaxAmount", typeof(decimal));
 
                 foreach (var item in lineItems)
                 {
-                    table.Rows.Add(item.ThresholdLevel, item.ThresholdMinAmount, item.ThresholdMaxAmount);
+                    table.Rows.Add(item.ThresholdType, item.ThresholdLevel, item.ThresholdMinAmount, item.ThresholdMaxAmount);
                 }
 
                 var parameters = new List<SqlParameter>
@@ -249,77 +251,6 @@ namespace AOSmith.Controllers
             }
         }
 
-        // ==================== ROW AMOUNT THRESHOLD ====================
 
-        /// <summary>
-        /// Get the single Row_Amount_Threshold record
-        /// </summary>
-        [HttpGet]
-        public async Task<JsonResult> GetRowAmountThreshold()
-        {
-            try
-            {
-                const string sql = @"SELECT TOP 1
-                    Row_ID AS RowId,
-                    Row_Amount AS RowAmount,
-                    Row_Created_ID AS RowCreatedId,
-                    Row_Created_Date AS RowCreatedDate,
-                    Row_Modified_ID AS RowModifiedId,
-                    Row_Modified_Date AS RowModifiedDate
-                FROM Row_Amount_Threshold ORDER BY Row_ID";
-
-                var result = (await _dbHelper.QueryAsync<RowAmountThreshold>(sql)).FirstOrDefault();
-                return Json(new { success = true, data = result }, JsonRequestBehavior.AllowGet);
-            }
-            catch (Exception ex)
-            {
-                return Json(new { success = false, message = ex.Message }, JsonRequestBehavior.AllowGet);
-            }
-        }
-
-        /// <summary>
-        /// Save (insert or update) the single Row_Amount_Threshold record
-        /// </summary>
-        [HttpPost]
-        [ValidateAntiForgeryToken]
-        public async Task<JsonResult> SaveRowAmountThreshold(decimal rowAmount)
-        {
-            try
-            {
-                var userId = SessionHelper.GetUserId();
-                if (userId != 1)
-                {
-                    return Json(new { success = false, message = "Access denied" });
-                }
-
-                const string sql = @"
-                    IF EXISTS (SELECT 1 FROM Row_Amount_Threshold)
-                    BEGIN
-                        UPDATE Row_Amount_Threshold
-                        SET Row_Amount = @RowAmount,
-                            Row_Modified_ID = @SessionId,
-                            Row_Modified_Date = GETDATE()
-                        WHERE Row_ID = (SELECT TOP 1 Row_ID FROM Row_Amount_Threshold ORDER BY Row_ID);
-                    END
-                    ELSE
-                    BEGIN
-                        INSERT INTO Row_Amount_Threshold (Row_Amount, Row_Created_ID, Row_Created_Date)
-                        VALUES (@RowAmount, @SessionId, GETDATE());
-                    END";
-
-                var parameters = new Dictionary<string, object>
-                {
-                    { "@RowAmount", rowAmount },
-                    { "@SessionId", userId }
-                };
-
-                await _dbHelper.ExecuteNonQueryAsync(sql, parameters);
-                return Json(new { success = true, message = "Row amount threshold saved successfully." });
-            }
-            catch (Exception ex)
-            {
-                return Json(new { success = false, message = ex.Message });
-            }
-        }
     }
 }
